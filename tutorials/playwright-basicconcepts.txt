@@ -1,0 +1,496 @@
+================================================================================
+PLAYWRIGHT INTERVIEW QUESTIONS & ANSWERS
+Based on: tests/mytest.spec.ts
+================================================================================
+
+SECTION 1: BASIC CONCEPTS
+================================================================================
+
+Q1. What is Playwright?
+A: Playwright is a modern end-to-end testing framework developed by Microsoft. It enables 
+automated testing of web applications across multiple browsers (Chromium, Firefox, WebKit) 
+with a single API. It supports multiple programming languages including JavaScript, 
+TypeScript, Python, Java, and .NET.
+
+Q2. What are the advantages of Playwright over Selenium?
+A: 
+- Auto-wait mechanism (waits for elements to be ready before actions)
+- Supports multiple browser contexts in a single test
+- Faster execution due to modern architecture
+- Built-in support for network interception and mocking
+- Better handling of modern web apps (SPAs)
+- Automatic screenshot and video recording
+- Support for mobile device emulation
+- Better debugging capabilities with inspector and trace viewer
+
+Q3. What is a fixture in Playwright?
+A: A fixture is a pre-configured object that Playwright automatically provides to tests. 
+Fixtures handle setup and teardown automatically, ensuring test isolation. Common fixtures 
+include 'page', 'browser', 'context', and 'request'. They eliminate the need for manual 
+lifecycle management and provide fresh resources for each test.
+
+Q4. What does {page} represent in the test function?
+A: {page} is a fixture that represents a fresh browser page/tab. The curly braces {} 
+indicate JavaScript destructuring syntax, which extracts the 'page' property from the 
+fixtures object that Playwright provides. Each test gets its own isolated page instance 
+that is automatically created before the test and cleaned up after.
+
+Q5. Explain the arrow function syntax (=>) in the test?
+A: The arrow function (=>) is modern JavaScript syntax for defining functions. It's 
+equivalent to the traditional 'function' keyword but more concise. In Playwright tests:
+  test('name', async ({page}) => { })  // Arrow function
+is equivalent to:
+  test('name', async function({page}) { })  // Traditional function
+
+================================================================================
+SECTION 2: ASYNC/AWAIT & PROMISES
+================================================================================
+
+Q6. Why do we use 'async' keyword in the test function?
+A: The 'async' keyword marks a function as asynchronous, meaning it returns a Promise. 
+In Playwright tests, we use 'async' because most Playwright operations (like page.goto, 
+page.click, etc.) are asynchronous and return Promises. Without 'async', we cannot use 
+'await' inside the function.
+
+Q7. What is the purpose of 'await' in Playwright tests?
+A: 'await' pauses the execution of the code until a Promise resolves. In Playwright:
+  await page.goto('url')  // Waits for page to fully load
+Without 'await', the test would continue executing before the action completes, leading 
+to race conditions and test failures.
+
+Q8. What happens if you don't use 'await' before page.goto()?
+A: The test will not wait for the page to load and will immediately proceed to the next 
+line. This can cause:
+- Assertions to fail because the page hasn't loaded yet
+- Elements not being found
+- Incorrect test results
+- Flaky tests that pass/fail randomly
+
+Q9. What is a Promise in JavaScript?
+A: A Promise is an object representing the eventual completion or failure of an 
+asynchronous operation. It can be in one of three states:
+- Pending: Initial state, operation not completed yet
+- Fulfilled: Operation completed successfully
+- Rejected: Operation failed
+Playwright methods return Promises that resolve when the operation completes.
+
+================================================================================
+SECTION 3: TEST STRUCTURE & ORGANIZATION
+================================================================================
+
+Q10. What is the difference between a test and a test suite?
+A: 
+- Test Case: A single test function that validates one specific scenario
+  Example: test('verify page title', ...)
+- Test Suite: A collection of related test cases, typically in one file
+  Example: mytest.spec.ts contains multiple test cases
+
+Q11. What is the purpose of the 'expect' function?
+A: The 'expect' function is used for assertions/validations in tests. It checks if actual 
+results match expected results. If the assertion fails, the test fails.
+Example: expect(page).toHaveTitle('My Shop')
+
+Q12. What does .toHaveTitle() do?
+A: .toHaveTitle() is an assertion method that validates the page title. It waits for the 
+page to have the specified title and fails the test if the title doesn't match. It has 
+built-in auto-waiting, so it will retry until the title appears or times out.
+
+Q13. What is the difference between page.title() and toHaveTitle()?
+A: 
+- page.title(): Returns the actual page title as a string (doesn't validate anything)
+- toHaveTitle(): An assertion that validates the page has the expected title (test fails if wrong)
+You use page.title() to retrieve the title, and toHaveTitle() to verify it.
+
+Q14. What does test.skip() do?
+A: test.skip() marks a test to be skipped during execution. The test will appear in 
+reports as "skipped" but won't run. Useful for:
+- Temporarily disabling flaky tests
+- Excluding tests not relevant for current testing
+- Work-in-progress tests
+
+================================================================================
+SECTION 4: BROWSER & CONFIGURATION
+================================================================================
+
+Q15. How many browsers does this test run in?
+A: Based on playwright.config.ts, this test runs in 3 browsers:
+- Chromium (Desktop Chrome)
+- Firefox (Desktop Firefox)
+- WebKit (Desktop Safari)
+Each test case executes once per browser, producing 3 test results.
+
+Q16. What does 'fullyParallel: true' mean in the config?
+A: It means all tests run simultaneously across all browsers at the same time, rather 
+than sequentially. This provides:
+- 3x faster execution (all browsers run at once)
+- Better CPU utilization
+- Quicker feedback during development
+
+Q17. What is the 'workers' setting in Playwright config?
+A: The 'workers' setting controls how many test files can run in parallel. In the config:
+- workers: undefined (locally) = Uses all available CPU cores
+- workers: 1 (on CI) = Runs tests sequentially to avoid resource conflicts
+More workers = faster execution but higher resource usage.
+
+Q18. How do you run tests in only one specific browser?
+A: Use the --project flag:
+  npx playwright test --project=chromium
+  npx playwright test --project=firefox
+  npx playwright test --project=webkit
+
+Q19. What is the testDir configuration option?
+A: testDir specifies the directory where Playwright looks for test files. In the config:
+  testDir: './tests'
+This tells Playwright to find all test files in the 'tests' folder.
+
+Q20. How can you exclude a specific test file from running?
+A: Multiple ways:
+1. Add testIgnore to config: testIgnore: '**/mytest.spec.ts'
+2. Use test.skip() in the file
+3. Rename file to non-test extension (.bak, .skip)
+4. Run specific files only: npx playwright test example.spec.ts
+
+================================================================================
+SECTION 5: PAGE ACTIONS & NAVIGATION
+================================================================================
+
+Q21. What does page.goto() do?
+A: page.goto() navigates to a specified URL. It waits for the page to load (by default 
+waits for 'load' event). You must use 'await' with it because it's asynchronous.
+Example: await page.goto('https://example.com')
+
+Q22. What are the different wait options for page.goto()?
+A: page.goto() can wait for different load states:
+- 'load' (default): Waits for load event (full page load)
+- 'domcontentloaded': Waits for DOM to be ready
+- 'networkidle': Waits for network to be idle (no requests for 500ms)
+Example: await page.goto('url', { waitUntil: 'networkidle' })
+
+Q23. How do you get the current page URL?
+A: Use page.url():
+  const currentUrl = page.url();
+No 'await' needed as it's a synchronous method.
+
+Q24. What is the difference between page.click() and page.locator().click()?
+A:
+- page.click('selector'): Older API, directly clicks using a selector
+- page.locator('selector').click(): Modern API, creates a locator first, then clicks
+The locator API is recommended as it provides better auto-waiting and error messages.
+
+================================================================================
+SECTION 6: ASSERTIONS & VALIDATIONS
+================================================================================
+
+Q25. What assertion methods are available in Playwright?
+A: Common assertion methods:
+- toHaveTitle(): Validates page title
+- toHaveURL(): Validates current URL
+- toBeVisible(): Checks if element is visible
+- toContainText(): Checks if element contains text
+- toHaveCount(): Validates number of elements
+- toBeEnabled(): Checks if element is enabled
+- toBeChecked(): Validates checkbox/radio state
+
+Q26. Do Playwright assertions have auto-wait?
+A: Yes! Playwright assertions have built-in auto-waiting. They will retry until:
+- The assertion passes
+- The timeout is reached (default 5 seconds)
+This makes tests more reliable and eliminates manual waits.
+
+Q27. How do you set a custom timeout for an assertion?
+A: Use the timeout option:
+  await expect(page).toHaveTitle('My Shop', { timeout: 10000 })  // 10 seconds
+
+Q28. What is a soft assertion?
+A: Soft assertions don't stop test execution when they fail. The test continues and 
+reports all failures at the end. Use expect.soft():
+  expect.soft(page).toHaveTitle('Wrong Title')  // Test continues even if this fails
+  // More assertions here
+
+================================================================================
+SECTION 7: DEBUGGING & REPORTING
+================================================================================
+
+Q29. How do you debug a Playwright test?
+A: Multiple ways:
+1. Use Playwright Inspector: npx playwright test --debug
+2. Add breakpoints in VS Code and debug
+3. Use page.pause() to pause execution
+4. Add console.log() statements
+5. Use headed mode: npx playwright test --headed
+6. Check trace viewer: npx playwright show-trace
+
+Q30. What does console.log() do in a Playwright test?
+A: console.log() outputs messages to the console/terminal during test execution. Useful 
+for debugging and verifying values:
+  console.log("Page title is: " + getPageTitle)
+The output appears in test results and helps troubleshoot issues.
+
+Q31. What is the Playwright trace viewer?
+A: The trace viewer is a GUI tool that shows a complete recording of test execution, 
+including:
+- Screenshots at each step
+- DOM snapshots
+- Network requests
+- Console logs
+- Test actions timeline
+Enabled with: trace: 'on-first-retry' in config
+
+Q32. What are the different reporter options in Playwright?
+A: Common reporters:
+- 'html': Interactive HTML report (default)
+- 'list': Simple list format in terminal
+- 'dot': Minimal dot progress indicator
+- 'json': JSON format for CI integration
+- 'junit': JUnit XML format
+- 'line': One line per test
+Configure in: reporter: 'html' in config
+
+Q33. How do you run tests in headed mode?
+A: Use the --headed flag:
+  npx playwright test --headed
+This shows the browser window during test execution, useful for debugging and seeing 
+what's happening visually.
+
+================================================================================
+SECTION 8: SELECTORS & LOCATORS
+================================================================================
+
+Q34. What are the different types of selectors in Playwright?
+A: 
+- CSS selectors: '#id', '.class', 'div > button'
+- Text selectors: 'text=Login', 'text="Exact text"'
+- Role selectors: 'role=button[name="Submit"]'
+- ID selectors: '#submit-button'
+- XPath selectors: '//button[@id="submit"]'
+- Data-testid: '[data-testid="login-button"]'
+
+Q35. What is the recommended selector strategy in Playwright?
+A: User-facing attributes are recommended:
+1. Role-based selectors (most resilient): page.getByRole('button', {name: 'Submit'})
+2. Text content: page.getByText('Login')
+3. Test IDs: page.getByTestId('submit-btn')
+4. CSS selectors (last resort)
+These are more resilient to UI changes than CSS selectors.
+
+Q36. What is page.locator()?
+A: page.locator() creates a Locator object that represents an element or elements on the 
+page. Locators are lazy - they don't perform any actions until an action method is called:
+  const button = page.locator('button')  // Doesn't search yet
+  await button.click()  // Now it searches and clicks
+
+Q37. What is the difference between locator and waitForSelector?
+A: 
+- locator: Modern API with built-in auto-waiting, returns immediately
+- waitForSelector: Older API that explicitly waits for element to appear
+Locators are preferred as they automatically wait when performing actions.
+
+================================================================================
+SECTION 9: BEST PRACTICES
+================================================================================
+
+Q38. What are some Playwright testing best practices?
+A: 
+1. Use user-facing selectors (role, text) over CSS selectors
+2. Avoid hard-coded waits (page.waitForTimeout) - use auto-waiting
+3. Use fixtures for reusable setup/teardown
+4. Keep tests independent and isolated
+5. Use descriptive test names
+6. Use Page Object Model for complex applications
+7. Enable trace collection for debugging
+8. Run tests in parallel when possible
+9. Use data-testid for dynamic content
+10. Handle test data properly (create/cleanup)
+
+Q39. Should you use page.waitForTimeout()?
+A: Generally NO! Hard-coded waits (page.waitForTimeout) are considered bad practice 
+because:
+- Tests become slower
+- Makes tests flaky (might not wait long enough)
+- Wastes time if element appears quickly
+Instead, use Playwright's auto-waiting mechanisms with locators and assertions.
+
+Q40. What is the Page Object Model?
+A: Page Object Model (POM) is a design pattern where each page/component of the 
+application has a corresponding class. This class contains:
+- Locators for elements on that page
+- Methods for actions on that page
+Benefits: Better code organization, reusability, easier maintenance.
+
+Example:
+class LoginPage {
+  constructor(page) { this.page = page; }
+  async login(username, password) {
+    await this.page.fill('#username', username);
+    await this.page.fill('#password', password);
+    await this.page.click('#submit');
+  }
+}
+
+================================================================================
+SECTION 10: ADVANCED CONCEPTS
+================================================================================
+
+Q41. What is a browser context in Playwright?
+A: A browser context is an isolated browsing session, similar to an incognito window. 
+Each context has separate:
+- Cookies
+- Local storage
+- Session storage
+- Cache
+You can create multiple contexts in one browser for test isolation.
+
+Q42. What is the difference between browser, context, and page?
+A: 
+- Browser: The browser instance (Chromium, Firefox, WebKit)
+- Context: Isolated browsing session within browser (like incognito)
+- Page: A single tab/page within a context
+Hierarchy: Browser → Context → Page
+
+Q43. How do you handle network requests in Playwright?
+A: Use route and request interception:
+  await page.route('**/api/data', route => route.fulfill({
+    status: 200,
+    body: JSON.stringify({ data: 'mocked' })
+  }));
+This allows mocking API responses for testing.
+
+Q44. How do you take screenshots in Playwright?
+A: Use page.screenshot():
+  await page.screenshot({ path: 'screenshot.png' });
+  await page.screenshot({ path: 'full.png', fullPage: true });  // Full page
+
+Q45. What is retries in Playwright config?
+A: Retries automatically re-run failed tests a specified number of times:
+  retries: 2  // Retry failed tests up to 2 times
+In the config: retries: process.env.CI ? 2 : 0
+(Retries on CI but not locally)
+
+Q46. How do you handle file uploads in Playwright?
+A: Use setInputFiles():
+  await page.locator('input[type="file"]').setInputFiles('path/to/file.pdf');
+  await page.locator('input[type="file"]').setInputFiles([
+    'file1.pdf', 
+    'file2.pdf'
+  ]);  // Multiple files
+
+Q47. How do you handle alerts/popups in Playwright?
+A: Listen to dialog events:
+  page.on('dialog', dialog => {
+    console.log(dialog.message());
+    dialog.accept();  // or dialog.dismiss()
+  });
+Playwright auto-dismisses dialogs if no handler is set.
+
+Q48. What is the purpose of baseURL in config?
+A: baseURL allows you to use relative URLs in tests:
+  use: { baseURL: 'https://example.com' }
+Then in tests:
+  await page.goto('/login')  // Goes to https://example.com/login
+
+Q49. How do you run only specific tests?
+A: Multiple ways:
+1. Use test.only(): test.only('my test', ...)
+2. Run specific file: npx playwright test mytest.spec.ts
+3. Use --grep flag: npx playwright test --grep "page title"
+4. Run by line number: npx playwright test mytest.spec.ts:25
+
+Q50. How do you share state between tests?
+A: Generally, you SHOULDN'T share state (tests should be independent). But if needed:
+1. Use test.beforeAll() to set up shared state
+2. Use custom fixtures
+3. Use global setup
+However, independent tests are more reliable and parallelizable.
+
+================================================================================
+SECTION 11: TYPESCRIPT SPECIFIC
+================================================================================
+
+Q51. Why use TypeScript for Playwright tests?
+A: Benefits of TypeScript:
+- Type safety: Catches errors at compile time
+- Better IDE support: Auto-completion and IntelliSense
+- Better refactoring: Easier to rename and reorganize
+- Self-documenting: Types serve as inline documentation
+- Fewer runtime errors: Type checking prevents common mistakes
+
+Q52. What does `:string` mean in `let getPageTitle:string`?
+A: It's a TypeScript type annotation that specifies the variable type. 
+  let getPageTitle:string = await page.title()
+This ensures getPageTitle can only contain string values, providing type safety.
+
+Q53. What is the type of the 'page' fixture?
+A: The 'page' fixture has the type 'Page' from Playwright:
+  import { Page } from '@playwright/test';
+  async ({page}: {page: Page}) => { }
+
+================================================================================
+SECTION 12: CI/CD INTEGRATION
+================================================================================
+
+Q54. How do you run Playwright tests in CI/CD?
+A: 
+1. Install dependencies: npm ci
+2. Install Playwright browsers: npx playwright install --with-deps
+3. Run tests: npx playwright test
+4. Upload test results/artifacts
+Common CI platforms: GitHub Actions, GitLab CI, Jenkins, Azure DevOps
+
+Q55. What is the purpose of `!!process.env.CI`?
+A: The !! converts the value to boolean:
+  forbidOnly: !!process.env.CI
+- If process.env.CI exists → true (forbid test.only in CI)
+- If process.env.CI is undefined → false (allow test.only locally)
+Prevents accidentally leaving test.only() in CI builds.
+
+Q56. How do you generate and store test artifacts in CI?
+A: Playwright automatically generates artifacts:
+- Screenshots on failure
+- Videos (if enabled)
+- Traces (if enabled)
+- HTML reports
+Store in CI using artifact upload actions (depends on CI platform).
+
+================================================================================
+SECTION 13: TROUBLESHOOTING
+================================================================================
+
+Q57. What if a test passes locally but fails in CI?
+A: Common causes:
+1. Timing issues: Add proper waits, use auto-waiting
+2. Different screen sizes: Set viewport size explicitly
+3. Resources not loaded: Increase timeouts
+4. Environment differences: Check environment variables
+5. Flaky tests: Use retries and proper assertions
+
+Q58. How do you handle flaky tests?
+A: Strategies:
+1. Use Playwright's auto-waiting (avoid hard-coded waits)
+2. Use proper assertions with timeouts
+3. Enable retries for flaky tests
+4. Use network idle wait for dynamic content
+5. Stabilize test data
+6. Check for race conditions
+
+Q59. What does "element not found" error mean?
+A: The element doesn't exist in the DOM when Playwright tries to interact with it.
+Solutions:
+1. Check selector is correct
+2. Wait for element: await page.waitForSelector()
+3. Use locator with auto-waiting
+4. Ensure page is fully loaded
+5. Check if element is in iframe
+
+Q60. How do you debug "timeout exceeded" errors?
+A: 
+1. Increase timeout: { timeout: 30000 }
+2. Check if element actually appears
+3. Use headed mode to see what's happening
+4. Check network requests in trace viewer
+5. Verify selectors are correct
+6. Check if page is still loading
+
+================================================================================
+END OF INTERVIEW QUESTIONS
+Total Questions: 60
+================================================================================

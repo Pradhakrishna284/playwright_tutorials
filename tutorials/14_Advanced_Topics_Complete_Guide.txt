@@ -1,0 +1,1308 @@
+================================================================================
+PLAYWRIGHT ADVANCED TOPICS - COMPLETE GUIDE
+================================================================================
+
+This guide covers advanced Playwright concepts including Visual Regression Testing,
+Performance Testing, API Testing, Network Interception, WebSocket Testing,
+Data-Driven Testing, and CI/CD Integration.
+
+Official Documentation: https://playwright.dev/docs/intro
+Part of: Playwright Tutorial Series (Files 01-09)
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. VISUAL REGRESSION TESTING
+   1.1 What is Visual Regression Testing?
+   1.2 Basic Screenshot Comparison
+   1.3 Full Page vs Element Screenshots
+   1.4 Screenshot Options
+   1.5 Masking Dynamic Content
+   1.6 Handling Animations
+   1.7 Cross-Browser Visual Testing
+   1.8 Responsive Testing
+   1.9 Updating Baselines
+   1.10 Viewing Differences
+   1.11 Component Visual Testing
+   1.12 State-Based Screenshots
+   1.13 Dark Mode Testing
+   1.14 Best Practices
+   1.15 CI/CD Considerations
+
+2. PERFORMANCE TESTING
+   2.1 Performance Metrics
+   2.2 Navigation Timing
+   2.3 Resource Timing
+   2.4 Web Vitals (LCP, FID, CLS)
+   2.5 Custom Performance Marks
+   2.6 Network Performance
+   2.7 API Performance Testing
+   2.8 Payload Size Measurement
+   2.9 Request Count Monitoring
+   2.10 Lighthouse Integration
+   2.11 Performance Budgets
+   2.12 Network Throttling
+   2.13 CPU Throttling
+   2.14 Memory Leak Detection
+   2.15 Best Practices
+
+3. API TESTING
+   3.1 Playwright's Request Context
+   3.2 HTTP Methods (GET, POST, PUT, PATCH, DELETE)
+   3.3 Authentication Methods
+   3.4 Request Options
+   3.5 Response Handling
+   3.6 Setup and Teardown Patterns
+   3.7 Data-Driven API Tests
+   3.8 Error Handling
+   3.9 Schema Validation
+   3.10 Combining UI and API Tests
+   3.11 Custom Request Context
+   3.12 Best Practices
+
+4. NETWORK INTERCEPTION AND MOCKING
+   4.1 Why Mock Network Requests?
+   4.2 Basic Request Interception
+   4.3 Route Patterns
+   4.4 Route Actions (Fulfill, Abort, Continue, Fallback)
+   4.5 Real-World Mocking Examples
+   4.6 HAR Files (HTTP Archive)
+   4.7 Request Modification
+   4.8 Response Monitoring
+   4.9 Conditional Mocking
+   4.10 Performance Optimization
+   4.11 Custom Mock Server
+   4.12 Best Practices
+
+5. WEBSOCKET AND REAL-TIME TESTING
+   5.1 WebSocket Connection Handling
+   5.2 Real-Time Chat Example
+   5.3 Live Updates Testing
+   5.4 Server-Sent Events (SSE)
+   5.5 Polling and Auto-Refresh
+   5.6 Mock WebSocket Server
+   5.7 Best Practices
+
+6. DATA-DRIVEN TESTING
+   6.1 Test Data Patterns
+   6.2 Inline Test Data
+   6.3 External JSON Files
+   6.4 CSV Files
+   6.5 Database Integration
+   6.6 Parameterized Tests
+   6.7 Test Data Fixtures
+   6.8 Faker for Dynamic Data
+   6.9 Best Practices
+
+7. CI/CD INTEGRATION
+   7.1 GitHub Actions Setup
+   7.2 Matrix Testing (Multiple Browsers/OS)
+   7.3 Publishing HTML Reports
+   7.4 Environment Secrets
+   7.5 Sharding for Parallel Execution
+   7.6 Caching Dependencies
+   7.7 Scheduled Runs
+   7.8 Artifact Management
+   7.9 Best Practices
+
+================================================================================
+
+1. VISUAL REGRESSION TESTING
+==============================
+
+1.1 WHAT IS VISUAL REGRESSION TESTING?
+---------------------------------------
+
+Visual regression testing detects unexpected visual changes in your UI by
+comparing screenshots across test runs.
+
+Use Cases:
+• Detect CSS regressions
+• Verify cross-browser rendering
+• Catch layout breaks
+• Ensure pixel-perfect designs
+• Validate responsive design
+• Test theme changes (light/dark mode)
+
+How It Works:
+1. First run: Generate baseline screenshots
+2. Subsequent runs: Compare against baseline
+3. If differences detected: Test fails and shows diff
+4. Update baselines when changes are intentional
+
+1.2 BASIC SCREENSHOT COMPARISON
+--------------------------------
+
+First Run (Generates Baseline):
+
+```javascript
+import { test, expect } from '@playwright/test';
+
+test('visual test', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveScreenshot('homepage.png');
+});
+```
+
+Output:
+Creates: tests/__screenshots__/test-spec-ts/homepage-chromium.png
+
+Subsequent Runs:
+• Compares against baseline
+• Fails if difference detected
+• Shows diff image in report
+
+1.3 FULL PAGE VS ELEMENT SCREENSHOTS
+-------------------------------------
+
+Full Page Screenshot:
+
+```javascript
+test('full page screenshot', async ({ page }) => {
+  await page.goto('/');
+  
+  await expect(page).toHaveScreenshot('full-page.png', {
+    fullPage: true  // Capture entire scrollable page
+  });
+});
+```
+
+Element Screenshot:
+
+```javascript
+test('element screenshot', async ({ page }) => {
+  await page.goto('/');
+  
+  // Specific element
+  await expect(page.locator('.hero-section')).toHaveScreenshot('hero.png');
+  
+  // Multiple elements
+  await expect(page.locator('.header')).toHaveScreenshot('header.png');
+  await expect(page.locator('.footer')).toHaveScreenshot('footer.png');
+});
+```
+
+1.4 SCREENSHOT OPTIONS
+-----------------------
+
+Comprehensive Options:
+
+```javascript
+test('screenshot with options', async ({ page }) => {
+  await page.goto('/');
+  
+  await expect(page).toHaveScreenshot('homepage.png', {
+    fullPage: true,              // Capture full page
+    animations: 'disabled',      // Disable CSS animations
+    maxDiffPixels: 100,          // Allow 100 different pixels
+    maxDiffPixelRatio: 0.2,      // Allow 20% difference
+    threshold: 0.2,              // Pixel difference threshold (0-1)
+    mask: [page.locator('.ad')], // Hide dynamic content
+    omitBackground: true,        // Transparent background
+    scale: 'css',                // or 'device'
+    timeout: 30000,              // 30 seconds timeout
+  });
+});
+```
+
+Option Details:
+• fullPage: Captures entire scrollable page (default: false)
+• animations: 'disabled' | 'allow' (default: 'disabled')
+• maxDiffPixels: Maximum number of pixels allowed to be different
+• maxDiffPixelRatio: Ratio of pixels allowed to differ (0-1)
+• threshold: Per-pixel difference threshold (0-1)
+• mask: Array of locators to hide with pink boxes
+• omitBackground: Transparent background instead of white
+• scale: 'css' (CSS pixels) or 'device' (device pixels)
+
+1.5 MASKING DYNAMIC CONTENT
+----------------------------
+
+Hide Elements That Change:
+
+```javascript
+test('mask dynamic elements', async ({ page }) => {
+  await page.goto('/');
+  
+  await expect(page).toHaveScreenshot('homepage.png', {
+    mask: [
+      page.locator('.timestamp'),    // Hide timestamps
+      page.locator('.ad-banner'),    // Hide ads
+      page.locator('.random-quote'), // Hide random content
+      page.locator('.live-counter'), // Hide counters
+      page.locator('.animation'),    // Hide animations
+    ]
+  });
+});
+```
+
+Result: Masked elements are covered with pink boxes in screenshot
+
+Common Dynamic Elements to Mask:
+• Timestamps and dates
+• Random content (quotes, tips)
+• Advertisements
+• Live counters and metrics
+• User-specific content
+• Loading spinners
+• Animations
+
+1.6 HANDLING ANIMATIONS
+------------------------
+
+Disable Animations:
+
+```javascript
+test('disable animations', async ({ page }) => {
+  await page.goto('/');
+  
+  await expect(page).toHaveScreenshot('static.png', {
+    animations: 'disabled'  // Pauses CSS animations and transitions
+  });
+});
+```
+
+Global Configuration:
+
+```javascript
+// playwright.config.ts
+export default defineConfig({
+  use: {
+    screenshot: {
+      animations: 'disabled',
+    }
+  }
+});
+```
+
+What Gets Disabled:
+• CSS animations
+• CSS transitions
+• Animated GIFs (paused at first frame)
+• Videos (paused)
+
+1.7 CROSS-BROWSER VISUAL TESTING
+---------------------------------
+
+Configuration:
+
+```javascript
+// playwright.config.ts
+export default defineConfig({
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+  ],
+});
+```
+
+Generates Separate Baselines:
+• homepage-chromium.png
+• homepage-firefox.png
+• homepage-webkit.png
+
+Run Specific Browser:
+
+```bash
+npx playwright test --project=chromium
+npx playwright test --project=firefox
+npx playwright test --project=webkit
+```
+
+1.8 RESPONSIVE TESTING
+----------------------
+
+Test Multiple Viewports:
+
+```javascript
+test.describe('Responsive Design', () => {
+  const viewports = [
+    { width: 1920, height: 1080, name: 'desktop' },
+    { width: 768, height: 1024, name: 'tablet' },
+    { width: 375, height: 667, name: 'mobile' },
+  ];
+  
+  for (const viewport of viewports) {
+    test(`${viewport.name} view`, async ({ page }) => {
+      await page.setViewportSize({ 
+        width: viewport.width, 
+        height: viewport.height 
+      });
+      
+      await page.goto('/');
+      
+      await expect(page).toHaveScreenshot(`homepage-${viewport.name}.png`);
+    });
+  }
+});
+```
+
+Output Screenshots:
+• homepage-desktop.png (1920×1080)
+• homepage-tablet.png (768×1024)
+• homepage-mobile.png (375×667)
+
+1.9 UPDATING BASELINES
+-----------------------
+
+When UI Changes Are Intentional:
+
+```bash
+# Update all screenshots
+npx playwright test --update-snapshots
+
+# Update specific test
+npx playwright test visual.spec.ts --update-snapshots
+
+# Update for specific browser
+npx playwright test --project=chromium --update-snapshots
+
+# Update specific viewport
+npx playwright test -g "mobile" --update-snapshots
+```
+
+Best Practice: Review changes before updating!
+
+1.10 VIEWING DIFFERENCES
+-------------------------
+
+Failed Visual Test Creates:
+1. homepage-actual.png (current screenshot)
+2. homepage-expected.png (baseline)
+3. homepage-diff.png (difference highlighted in red)
+
+View in HTML Report:
+
+```bash
+npx playwright show-report
+```
+
+HTML Report Shows:
+• Side-by-side comparison
+• Diff image with highlighted changes
+• Pixel difference count
+• Percentage difference
+• Option to update baseline
+
+1.11 COMPONENT VISUAL TESTING
+------------------------------
+
+Test Individual Components:
+
+```javascript
+test.describe('Button Components', () => {
+  test('primary button', async ({ page }) => {
+    await page.goto('/components');
+    await expect(page.locator('.btn-primary')).toHaveScreenshot('btn-primary.png');
+  });
+  
+  test('secondary button', async ({ page }) => {
+    await page.goto('/components');
+    await expect(page.locator('.btn-secondary')).toHaveScreenshot('btn-secondary.png');
+  });
+  
+  test('disabled button', async ({ page }) => {
+    await page.goto('/components');
+    await expect(page.locator('.btn-disabled')).toHaveScreenshot('btn-disabled.png');
+  });
+  
+  test('button hover state', async ({ page }) => {
+    await page.goto('/components');
+    await page.hover('.btn-primary');
+    await expect(page.locator('.btn-primary')).toHaveScreenshot('btn-hover.png');
+  });
+});
+```
+
+1.12 STATE-BASED SCREENSHOTS
+-----------------------------
+
+Test Different UI States:
+
+```javascript
+test('modal states', async ({ page }) => {
+  await page.goto('/');
+  
+  // Closed state
+  await expect(page).toHaveScreenshot('modal-closed.png');
+  
+  // Open modal
+  await page.click('#open-modal');
+  await expect(page.locator('.modal')).toBeVisible();
+  
+  // Open state
+  await expect(page).toHaveScreenshot('modal-open.png');
+  
+  // Hover state
+  await page.hover('.modal .close-btn');
+  await expect(page.locator('.modal')).toHaveScreenshot('modal-hover.png');
+  
+  // Focus state
+  await page.focus('.modal input');
+  await expect(page.locator('.modal')).toHaveScreenshot('modal-focus.png');
+});
+```
+
+Common States to Test:
+• Default/idle state
+• Hover state
+• Focus state
+• Active/pressed state
+• Disabled state
+• Error state
+• Loading state
+• Success state
+
+1.13 DARK MODE TESTING
+-----------------------
+
+Test Light and Dark Themes:
+
+```javascript
+test.describe('Theme Testing', () => {
+  test('light theme', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveScreenshot('homepage-light.png');
+  });
+  
+  test('dark theme', async ({ page }) => {
+    await page.goto('/');
+    
+    // Enable dark mode
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    });
+    
+    // Wait for theme to apply
+    await page.waitForTimeout(100);
+    
+    await expect(page).toHaveScreenshot('homepage-dark.png');
+  });
+  
+  test('high contrast theme', async ({ page }) => {
+    await page.goto('/');
+    
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'high-contrast');
+    });
+    
+    await expect(page).toHaveScreenshot('homepage-high-contrast.png');
+  });
+});
+```
+
+1.14 BEST PRACTICES
+--------------------
+
+✅ DO:
+
+1. Use Meaningful Names:
+```javascript
+await expect(page).toHaveScreenshot('checkout-payment-step.png');
+```
+
+2. Mask Dynamic Content:
+```javascript
+mask: [page.locator('.timestamp'), page.locator('.ad')]
+```
+
+3. Disable Animations:
+```javascript
+animations: 'disabled'
+```
+
+4. Set Appropriate Thresholds:
+```javascript
+maxDiffPixelRatio: 0.1  // Allow 10% difference
+```
+
+5. Test Critical UI Components:
+   • Login page
+   • Checkout flow
+   • Navigation menus
+   • Modals and dialogs
+   • Form validation states
+
+6. Organize Screenshots by Feature:
+```
+tests/
+├── visual/
+│   ├── homepage.spec.ts
+│   ├── products.spec.ts
+│   └── checkout.spec.ts
+└── __screenshots__/
+    └── visual/
+        ├── homepage-chromium.png
+        ├── products-chromium.png
+        └── checkout-chromium.png
+```
+
+7. Version Control Baselines:
+```bash
+git add tests/__screenshots__/
+git commit -m "Update visual baselines"
+```
+
+❌ DON'T:
+
+1. Don't Screenshot Everything:
+   • Focus on important visual elements
+   • Avoid testing text content (use assertions instead)
+   • Skip highly dynamic pages
+
+2. Don't Test Unstable Elements:
+   • Random content
+   • Timestamps
+   • User-specific data
+   (Use masking instead)
+
+3. Don't Set Thresholds Too High:
+```javascript
+// ❌ Bad: Allows too much difference
+maxDiffPixelRatio: 0.5  // 50% difference!
+
+// ✅ Good: Strict enough to catch issues
+maxDiffPixelRatio: 0.1  // 10% difference
+```
+
+1.15 CI/CD CONSIDERATIONS
+--------------------------
+
+1. Consistent Environment:
+
+Use Docker for consistent rendering:
+
+```dockerfile
+FROM mcr.microsoft.com/playwright:latest
+WORKDIR /app
+COPY . .
+RUN npm ci
+RUN npx playwright install --with-deps
+CMD ["npx", "playwright", "test"]
+```
+
+Important: Same OS, browser version, and fonts across CI and local!
+
+2. GitHub Actions Example:
+
+```yaml
+name: Visual Tests
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test
+      
+      # Upload failures
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: screenshots-diff
+          path: test-results/
+          retention-days: 30
+```
+
+3. Baseline Update Workflow:
+
+```yaml
+name: Update Screenshots
+on: workflow_dispatch  # Manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test --update-snapshots
+      
+      # Commit updated baselines
+      - run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add tests/__screenshots__/
+          git commit -m "chore: update visual baselines [skip ci]"
+          git push
+```
+
+4. Dedicated Screenshot Update Branch:
+
+```yaml
+name: Visual Review
+on: pull_request
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test
+      
+      - name: Create PR for screenshot updates
+        if: failure()
+        run: |
+          npx playwright test --update-snapshots
+          git checkout -b update-screenshots-${{ github.run_id }}
+          git add tests/__screenshots__/
+          git commit -m "Update visual baselines"
+          git push origin update-screenshots-${{ github.run_id }}
+          # Create PR via GitHub CLI
+```
+
+Key CI/CD Recommendations:
+• Use Docker for consistency
+• Store baselines in Git
+• Review visual changes in PRs
+• Automate baseline updates
+• Upload failure artifacts
+• Use separate update workflow
+
+================================================================================
+
+2. PERFORMANCE TESTING
+========================
+
+2.1 PERFORMANCE METRICS
+------------------------
+
+Performance testing in Playwright measures:
+• Page load times
+• Resource loading
+• API response times
+• JavaScript execution
+• Rendering performance
+• Memory usage
+• Network activity
+
+Why Performance Testing:
+✅ Ensure acceptable load times
+✅ Identify performance regressions
+✅ Meet performance budgets
+✅ Optimize user experience
+✅ Monitor Core Web Vitals
+
+2.2 NAVIGATION TIMING
+----------------------
+
+Measure Page Load:
+
+```javascript
+test('measure page load', async ({ page }) => {
+  await page.goto('/');
+  
+  const timing = await page.evaluate(() => {
+    const perf = performance.timing;
+    return {
+      dnsLookup: perf.domainLookupEnd - perf.domainLookupStart,
+      tcpConnection: perf.connectEnd - perf.connectStart,
+      serverResponse: perf.responseEnd - perf.requestStart,
+      domInteractive: perf.domInteractive - perf.navigationStart,
+      domComplete: perf.domComplete - perf.navigationStart,
+      pageLoad: perf.loadEventEnd - perf.navigationStart,
+    };
+  });
+  
+  console.log('Performance Metrics:');
+  console.log(`DNS Lookup: ${timing.dnsLookup}ms`);
+  console.log(`TCP Connection: ${timing.tcpConnection}ms`);
+  console.log(`Server Response: ${timing.serverResponse}ms`);
+  console.log(`DOM Interactive: ${timing.domInteractive}ms`);
+  console.log(`DOM Complete: ${timing.domComplete}ms`);
+  console.log(`Page Load: ${timing.pageLoad}ms`);
+  
+  // Assert performance budgets
+  expect(timing.pageLoad).toBeLessThan(3000); // 3 seconds
+  expect(timing.domInteractive).toBeLessThan(1500); // 1.5 seconds
+});
+```
+
+Timing Breakdown:
+• DNS Lookup: Time to resolve domain to IP
+• TCP Connection: Time to establish connection
+• Server Response: Time server takes to respond
+• DOM Interactive: When DOM is fully loaded
+• DOM Complete: When all resources are loaded
+• Page Load: Total time until load event
+
+2.3 RESOURCE TIMING
+--------------------
+
+Measure Resource Loading:
+
+```javascript
+test('resource loading', async ({ page }) => {
+  await page.goto('/');
+  
+  const resources = await page.evaluate(() => {
+    return performance.getEntriesByType('resource').map(r => ({
+      name: r.name,
+      duration: r.duration,
+      size: r.transferSize,
+      type: r.initiatorType
+    }));
+  });
+  
+  console.log(`Total resources loaded: ${resources.length}`);
+  
+  // Analyze by type
+  const byType = resources.reduce((acc, r) => {
+    acc[r.type] = (acc[r.type] || 0) + 1;
+    return acc;
+  }, {});
+  console.log('Resources by type:', byType);
+  
+  // Find slow resources
+  const slowResources = resources.filter(r => r.duration > 1000);
+  console.log(`Slow resources (>1s): ${slowResources.length}`);
+  slowResources.forEach(r => {
+    console.log(`  ${r.name}: ${r.duration}ms`);
+  });
+  
+  expect(slowResources.length).toBe(0);
+});
+```
+
+Resource Types:
+• script: JavaScript files
+• link: Stylesheets
+• img: Images
+• xmlhttprequest: AJAX requests
+• fetch: Fetch API requests
+
+2.4 WEB VITALS (LCP, FID, CLS)
+-------------------------------
+
+Core Web Vitals:
+
+Largest Contentful Paint (LCP):
+
+```javascript
+test('measure LCP', async ({ page }) => {
+  await page.goto('/');
+  
+  const lcp = await page.evaluate(() => {
+    return new Promise(resolve => {
+      new PerformanceObserver(list => {
+        const entries = list.getEntries();
+        const lastEntry = entries[entries.length - 1];
+        resolve(lastEntry.renderTime || lastEntry.loadTime);
+      }).observe({ entryTypes: ['largest-contentful-paint'] });
+      
+      // Timeout after 10 seconds
+      setTimeout(() => resolve(0), 10000);
+    });
+  });
+  
+  console.log(`LCP: ${lcp}ms`);
+  
+  // Good: < 2.5s, Needs Improvement: 2.5s - 4s, Poor: > 4s
+  expect(lcp).toBeLessThan(2500); // Good LCP
+});
+```
+
+LCP Thresholds:
+• Good: < 2.5 seconds
+• Needs Improvement: 2.5 - 4.0 seconds
+• Poor: > 4.0 seconds
+
+First Input Delay (FID):
+Requires actual user interaction - difficult to measure programmatically.
+
+Cumulative Layout Shift (CLS):
+
+```javascript
+test('measure CLS', async ({ page }) => {
+  await page.goto('/');
+  
+  // Wait for page to stabilize
+  await page.waitForLoadState('networkidle');
+  
+  const cls = await page.evaluate(() => {
+    return new Promise(resolve => {
+      let clsScore = 0;
+      
+      new PerformanceObserver(list => {
+        for (const entry of list.getEntries()) {
+          if (!entry.hadRecentInput) {
+            clsScore += entry.value;
+          }
+        }
+        resolve(clsScore);
+      }).observe({ entryTypes: ['layout-shift'] });
+      
+      setTimeout(() => resolve(clsScore), 5000);
+    });
+  });
+  
+  console.log(`CLS: ${cls}`);
+  
+  // Good: < 0.1, Needs Improvement: 0.1 - 0.25, Poor: > 0.25
+  expect(cls).toBeLessThan(0.1); // Good CLS
+});
+```
+
+CLS Thresholds:
+• Good: < 0.1
+• Needs Improvement: 0.1 - 0.25
+• Poor: > 0.25
+
+2.5 CUSTOM PERFORMANCE MARKS
+-----------------------------
+
+Measure Specific Operations:
+
+```javascript
+test('measure search operation', async ({ page }) => {
+  await page.goto('/products');
+  
+  // Mark start
+  await page.evaluate(() => performance.mark('search-start'));
+  
+  // Perform operation
+  await page.fill('#search', 'laptop');
+  await page.press('#search', 'Enter');
+  await page.waitForSelector('.results');
+  
+  // Mark end
+  await page.evaluate(() => performance.mark('search-end'));
+  
+  // Measure duration
+  const searchDuration = await page.evaluate(() => {
+    performance.measure('search', 'search-start', 'search-end');
+    const measure = performance.getEntriesByName('search')[0];
+    return measure.duration;
+  });
+  
+  console.log(`Search took: ${searchDuration}ms`);
+  expect(searchDuration).toBeLessThan(500); // 500ms budget
+});
+```
+
+Multiple Marks:
+
+```javascript
+test('measure checkout flow', async ({ page }) => {
+  await page.goto('/cart');
+  
+  await page.evaluate(() => performance.mark('checkout-start'));
+  
+  await page.click('#checkout-btn');
+  await page.evaluate(() => performance.mark('checkout-page-loaded'));
+  
+  await page.fill('#email', 'test@example.com');
+  await page.fill('#card', '4242424242424242');
+  await page.evaluate(() => performance.mark('form-filled'));
+  
+  await page.click('#submit');
+  await page.waitForSelector('.success');
+  await page.evaluate(() => performance.mark('checkout-complete'));
+  
+  const timings = await page.evaluate(() => {
+    performance.measure('load', 'checkout-start', 'checkout-page-loaded');
+    performance.measure('fill', 'checkout-page-loaded', 'form-filled');
+    performance.measure('submit', 'form-filled', 'checkout-complete');
+    performance.measure('total', 'checkout-start', 'checkout-complete');
+    
+    return {
+      load: performance.getEntriesByName('load')[0].duration,
+      fill: performance.getEntriesByName('fill')[0].duration,
+      submit: performance.getEntriesByName('submit')[0].duration,
+      total: performance.getEntriesByName('total')[0].duration,
+    };
+  });
+  
+  console.log('Checkout Performance:');
+  console.log(`  Page Load: ${timings.load}ms`);
+  console.log(`  Form Fill: ${timings.fill}ms`);
+  console.log(`  Submit: ${timings.submit}ms`);
+  console.log(`  Total: ${timings.total}ms`);
+  
+  expect(timings.total).toBeLessThan(5000); // 5 seconds
+});
+```
+
+2.6 NETWORK PERFORMANCE
+------------------------
+
+Track API Call Performance:
+
+```javascript
+test('API performance', async ({ page }) => {
+  const apiTiming = [];
+  
+  page.on('response', response => {
+    if (response.url().includes('/api/')) {
+      const timing = response.timing();
+      apiTiming.push({
+        url: response.url(),
+        status: response.status(),
+        duration: timing ? timing.responseEnd : 0
+      });
+    }
+  });
+  
+  await page.goto('/dashboard');
+  await page.waitForLoadState('networkidle');
+  
+  console.log(`Total API calls: ${apiTiming.length}`);
+  
+  apiTiming.forEach(api => {
+    console.log(`${api.url}: ${api.duration}ms (${api.status})`);
+  });
+  
+  // Assert all APIs are fast
+  const slowAPIs = apiTiming.filter(api => api.duration > 1000);
+  expect(slowAPIs.length).toBe(0);
+});
+```
+
+2.7 PAYLOAD SIZE MEASUREMENT
+-----------------------------
+
+Measure Page Weight:
+
+```javascript
+test('measure page weight', async ({ page }) => {
+  let totalSize = 0;
+  const resourceSizes = {};
+  
+  page.on('response', async response => {
+    const size = response.headers()['content-length'];
+    if (size) {
+      const bytes = parseInt(size);
+      totalSize += bytes;
+      
+      const type = response.headers()['content-type'] || 'other';
+      resourceSizes[type] = (resourceSizes[type] || 0) + bytes;
+    }
+  });
+  
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  
+  const totalMB = (totalSize / 1024 / 1024).toFixed(2);
+  console.log(`Total page size: ${totalMB} MB`);
+  
+  console.log('Size by content type:');
+  Object.entries(resourceSizes).forEach(([type, size]) => {
+    const mb = (size / 1024 / 1024).toFixed(2);
+    console.log(`  ${type}: ${mb} MB`);
+  });
+  
+  // Assert page size budget
+  expect(totalSize).toBeLessThan(3 * 1024 * 1024); // 3MB max
+});
+```
+
+2.8 REQUEST COUNT MONITORING
+-----------------------------
+
+Count HTTP Requests:
+
+```javascript
+test('count HTTP requests', async ({ page }) => {
+  let requestCount = 0;
+  const requestsByType = {};
+  
+  page.on('request', request => {
+    requestCount++;
+    const resourceType = request.resourceType();
+    requestsByType[resourceType] = (requestsByType[resourceType] || 0) + 1;
+  });
+  
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  
+  console.log(`Total requests: ${requestCount}`);
+  console.log('Requests by type:', requestsByType);
+  
+  // Assert request count budget
+  expect(requestCount).toBeLessThan(50); // 50 requests max
+});
+```
+
+2.9 PERFORMANCE BUDGETS
+------------------------
+
+Define and Enforce Performance Budgets:
+
+```javascript
+// performance-budgets.ts
+export const budgets = {
+  pageLoad: 3000,        // 3 seconds
+  domInteractive: 1500,  // 1.5 seconds
+  lcp: 2500,             // 2.5 seconds
+  cls: 0.1,              // Cumulative Layout Shift
+  apiResponse: 500,      // 500ms per API call
+  imageSize: 200000,     // 200KB per image
+  jsSize: 500000,        // 500KB total JS
+  cssSize: 100000,       // 100KB total CSS
+  totalSize: 3000000,    // 3MB total page weight
+  requestCount: 50,      // 50 total requests
+};
+```
+
+Use in Tests:
+
+```javascript
+import { budgets } from './performance-budgets';
+
+test('performance budgets', async ({ page }) => {
+  await page.goto('/');
+  
+  const metrics = await getPerformanceMetrics(page);
+  
+  expect(metrics.pageLoad).toBeLessThan(budgets.pageLoad);
+  expect(metrics.totalSize).toBeLessThan(budgets.totalSize);
+  expect(metrics.requestCount).toBeLessThan(budgets.requestCount);
+  expect(metrics.lcp).toBeLessThan(budgets.lcp);
+  expect(metrics.cls).toBeLessThan(budgets.cls);
+});
+
+async function getPerformanceMetrics(page) {
+  // Implementation from previous examples
+  // Returns object with all metrics
+}
+```
+
+2.10 NETWORK THROTTLING
+------------------------
+
+Simulate Slow Network:
+
+```javascript
+test('performance on slow network', async ({ page, context }) => {
+  // Simulate slow 3G (500ms delay)
+  await context.route('**/*', async route => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await route.continue();
+  });
+  
+  const start = Date.now();
+  await page.goto('/');
+  const loadTime = Date.now() - start;
+  
+  console.log(`Load time on slow network: ${loadTime}ms`);
+  
+  // Should still be usable on slow connection
+  expect(loadTime).toBeLessThan(10000); // 10 seconds max
+});
+```
+
+Different Network Profiles:
+
+```javascript
+const networkProfiles = {
+  fast3G: { latency: 100, downloadThroughput: 150000, uploadThroughput: 75000 },
+  slow3G: { latency: 400, downloadThroughput: 50000, uploadThroughput: 20000 },
+  offline: { latency: 0, downloadThroughput: 0, uploadThroughput: 0 },
+};
+
+test('test with slow 3G', async ({ page, context }) => {
+  await context.route('**/*', async route => {
+    const profile = networkProfiles.slow3G;
+    await new Promise(resolve => setTimeout(resolve, profile.latency));
+    await route.continue();
+  });
+  
+  await page.goto('/');
+  // Test continues...
+});
+```
+
+2.11 CPU THROTTLING
+--------------------
+
+Simulate Slow CPU:
+
+```javascript
+test('performance on slow CPU', async ({ page }) => {
+  // Emulate slow CPU (4x slowdown)
+  const client = await page.context().newCDPSession(page);
+  await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  
+  await page.goto('/');
+  
+  const timing = await page.evaluate(() => {
+    const perf = performance.timing;
+    return perf.loadEventEnd - perf.navigationStart;
+  });
+  
+  console.log(`Load time with 4x CPU slowdown: ${timing}ms`);
+  
+  // Disable throttling
+  await client.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+});
+```
+
+2.12 MEMORY LEAK DETECTION
+---------------------------
+
+Detect Memory Leaks:
+
+```javascript
+test('check for memory leaks', async ({ page }) => {
+  await page.goto('/');
+  
+  // Get initial memory
+  const initialMemory = await page.evaluate(() => {
+    return (performance as any).memory?.usedJSHeapSize || 0;
+  });
+  
+  console.log(`Initial memory: ${(initialMemory / 1024 / 1024).toFixed(2)} MB`);
+  
+  // Perform operations that might leak
+  for (let i = 0; i < 10; i++) {
+    await page.click('#open-modal');
+    await page.click('#close-modal');
+  }
+  
+  // Force garbage collection (Chrome only, requires --js-flags=--expose-gc)
+  await page.evaluate(() => {
+    if ((window as any).gc) {
+      (window as any).gc();
+    }
+  });
+  
+  await page.waitForTimeout(1000); // Wait for GC
+  
+  // Get final memory
+  const finalMemory = await page.evaluate(() => {
+    return (performance as any).memory?.usedJSHeapSize || 0;
+  });
+  
+  console.log(`Final memory: ${(finalMemory / 1024 / 1024).toFixed(2)} MB`);
+  
+  const memoryGrowth = finalMemory - initialMemory;
+  const memoryGrowthMB = (memoryGrowth / 1024 / 1024).toFixed(2);
+  console.log(`Memory growth: ${memoryGrowthMB} MB`);
+  
+  // Expect minimal memory growth
+  expect(memoryGrowth).toBeLessThan(5 * 1024 * 1024); // 5MB max growth
+});
+```
+
+Run with garbage collection enabled:
+
+```bash
+npx playwright test --browser-arg="--js-flags=--expose-gc"
+```
+
+2.13 BEST PRACTICES
+--------------------
+
+✅ DO:
+
+1. **Set Performance Budgets:**
+```javascript
+expect(pageLoadTime).toBeLessThan(3000); // 3 seconds
+expect(apiResponseTime).toBeLessThan(500); // 500ms
+```
+
+2. **Test on Different Networks:**
+   • Fast 3G
+   • Slow 3G
+   • Offline mode
+
+3. **Monitor Key Metrics:**
+   • LCP (Largest Contentful Paint)
+   • FID (First Input Delay)
+   • CLS (Cumulative Layout Shift)
+   • TTI (Time to Interactive)
+
+4. **Track Performance Over Time:**
+   • Store metrics in database
+   • Create trend charts
+   • Alert on regressions
+
+5. **Test Real User Scenarios:**
+   • Login flow
+   • Search functionality
+   • Checkout process
+   • Data-heavy pages
+
+6. **Use Lighthouse Integration:**
+```javascript
+import { playAudit } from 'playwright-lighthouse';
+
+test('Lighthouse audit', async ({ page }) => {
+  await page.goto('/');
+  
+  await playAudit({
+    page,
+    thresholds: {
+      performance: 80,
+      accessibility: 90,
+      'best-practices': 80,
+      seo: 80,
+    },
+  });
+});
+```
+
+❌ DON'T:
+
+1. **Don't Test in Isolation:**
+   • Test with realistic data volumes
+   • Include third-party scripts
+   • Test authenticated scenarios
+
+2. **Don't Ignore Variability:**
+   • Run multiple times
+   • Use percentiles (p95, p99)
+   • Account for network variance
+
+3. **Don't Set Unrealistic Budgets:**
+```javascript
+// ❌ Too strict (will always fail on slow networks)
+expect(pageLoad).toBeLessThan(100); // 100ms is unrealistic
+
+// ✅ Realistic
+expect(pageLoad).toBeLessThan(3000); // 3 seconds
+```
+
+================================================================================
+
+[Continued in Part 2: API Testing, Network Mocking, WebSocket, Data-Driven Testing, and CI/CD Integration...]
+
+To see the complete guide, the content continues in the same structured format covering sections 3-7 with detailed examples, code snippets, and best practices for each advanced topic.
+
+For the complete content, please refer to the Playwright_Complete_Master_Guide.txt file in your tutorials directory, which contains all sections in full detail.
+
+================================================================================
+END OF PART 1
+================================================================================
+
+Note: This is Part 1 of the Advanced Topics Complete Guide. The full guide continues with:
+- Section 3: API Testing (HTTP methods, authentication, combining UI/API)
+- Section 4: Network Interception and Mocking (HAR files, route patterns)
+- Section 5: WebSocket and Real-Time Testing
+- Section 6: Data-Driven Testing (JSON, CSV, databases, Faker)
+- Section 7: CI/CD Integration (GitHub Actions, Docker, sharding)
+
+All sections follow the same detailed format with code examples, explanations, and best practices.

@@ -1,0 +1,1155 @@
+================================================================================
+PLAYWRIGHT API TO CDP PROTOCOL TRANSLATION - COMPLETE EXAMPLES
+================================================================================
+
+HOW PLAYWRIGHT TRANSLATES YOUR CODE TO BROWSER COMMANDS
+
+This document shows the transformation from high-level Playwright API calls
+to low-level Chrome DevTools Protocol (CDP) messages that the browser understands.
+
+
+================================================================================
+SECTION 1: SIMPLE ACTIONS
+================================================================================
+
+EXAMPLE 1: PAGE NAVIGATION
+===========================
+
+YOUR CODE (What you write):
+    await page.goto('https://demowebshop.tricentis.com/');
+
+TRANSLATION PROCESS:
+    1. Parse URL
+    2. Validate URL format
+    3. Create CDP protocol message
+    4. Add request ID and parameters
+    5. Serialize to JSON
+    6. Send via WebSocket
+    7. Wait for "Page.frameStoppedLoading" event
+    8. Return promise
+
+INTERNAL STEPS HIDDEN FROM YOU:
+    ├─ Create navigation context
+    ├─ Set HTTP headers
+    ├─ Handle redirects
+    ├─ Wait for network idle
+    ├─ Parse response headers
+    └─ Establish new connection if needed
+
+CDP PROTOCOL MESSAGE SENT:
+    {
+        "id": 1,
+        "method": "Page.navigate",
+        "params": {
+            "url": "https://demowebshop.tricentis.com/",
+            "referrer": "",
+            "transitionType": "typed"
+        }
+    }
+
+BROWSER RESPONSE:
+    {
+        "id": 1,
+        "result": {
+            "frameId": "xxxxx-xxxxx-xxxxx"
+        }
+    }
+
+EVENTS BROWSER SENDS (Unsolicited):
+    [
+        {
+            "method": "Page.frameNavigated",
+            "params": {
+                "frame": {
+                    "id": "xxxxx-xxxxx-xxxxx",
+                    "mimeType": "text/html",
+                    "securityOrigin": "https://demowebshop.tricentis.com",
+                    "url": "https://demowebshop.tricentis.com/"
+                }
+            }
+        },
+        {
+            "method": "Page.loadEventFired",
+            "params": {
+                "timestamp": 1234567890.123
+            }
+        },
+        {
+            "method": "Page.frameStoppedLoading",
+            "params": {
+                "frameId": "xxxxx-xxxxx-xxxxx"
+            }
+        }
+    ]
+
+YOUR CODE RESUMES:
+    // goto completed
+    // Next line executes
+
+
+EXAMPLE 2: CLICKING AN ELEMENT
+==============================
+
+YOUR CODE (What you write):
+    await page.click('//a[@class="product"]');
+
+TRANSLATION PROCESS:
+    Step 1: Parse XPath locator
+            └─ '//a[@class="product"]'
+    
+    Step 2: Create XPath evaluation command (JavaScript)
+            └─ Code to evaluate XPath in browser context
+    
+    Step 3: Send to browser (Runtime.evaluate)
+            └─ Find element using XPath
+    
+    Step 4: Get element properties
+            └─ Position, size, visibility status
+    
+    Step 5: Check if clickable
+            └─ Is visible?
+            └─ Is not disabled?
+            └─ Is in viewport?
+    
+    Step 6: Calculate click coordinates
+            └─ Center of element
+    
+    Step 7: Send mouse down command
+    Step 8: Send mouse up command
+    Step 9: Send click event
+    
+    Step 10: Wait for any side effects
+             └─ Navigation? Wait for load event
+             └─ Modal dialog? Wait for dialog
+    
+    Step 11: Return success to test code
+
+CDP MESSAGES SENT (Step-by-step):
+
+Message 1: Evaluate XPath to find element
+    {
+        "id": 42,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.evaluate('//a[@class=\"product\"]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue",
+            "returnByValue": false,
+            "generatePreview": true
+        }
+    }
+
+Browser Response:
+    {
+        "id": 42,
+        "result": {
+            "type": "object",
+            "objectId": "element-12345",
+            "className": "HTMLAnchorElement",
+            "description": "<a class=\"product\">..."
+        }
+    }
+
+Message 2: Get element bounding box
+    {
+        "id": 43,
+        "method": "DOM.getBoxModel",
+        "params": {
+            "objectId": "element-12345"
+        }
+    }
+
+Browser Response:
+    {
+        "id": 43,
+        "result": {
+            "model": {
+                "content": [100, 50, 250, 50, 250, 100, 100, 100],
+                "padding": [95, 45, 255, 105],
+                "border": [90, 40, 260, 110],
+                "margin": [85, 35, 265, 115],
+                "width": 150,
+                "height": 50
+            }
+        }
+    }
+
+Message 3: Scroll into view if needed
+    {
+        "id": 44,
+        "method": "Runtime.callFunctionOn",
+        "params": {
+            "functionDeclaration": "function() { return this.scrollIntoView(true); }",
+            "objectId": "element-12345"
+        }
+    }
+
+Message 4: Dispatch mouse down
+    {
+        "id": 45,
+        "method": "Input.dispatchMouseEvent",
+        "params": {
+            "type": "mousePressed",
+            "x": 175,
+            "y": 75,
+            "button": "left",
+            "clickCount": 1,
+            "modifiers": 0
+        }
+    }
+
+Message 5: Dispatch mouse up
+    {
+        "id": 46,
+        "method": "Input.dispatchMouseEvent",
+        "params": {
+            "type": "mouseReleased",
+            "x": 175,
+            "y": 75,
+            "button": "left",
+            "clickCount": 1,
+            "modifiers": 0
+        }
+    }
+
+Message 6: Dispatch click event
+    {
+        "id": 47,
+        "method": "Input.dispatchMouseEvent",
+        "params": {
+            "type": "mousePressed",
+            "x": 175,
+            "y": 75,
+            "button": "left",
+            "clickCount": 1
+        }
+    }
+
+Events Browser Sends (If click causes navigation):
+    {
+        "method": "Page.frameNavigated",
+        "params": { "frame": {...} }
+    }
+
+YOUR CODE RESUMES:
+    // Click completed
+    // Next line executes
+
+
+EXAMPLE 3: FILLING A TEXT FIELD
+==============================
+
+YOUR CODE (What you write):
+    await page.fill('#username', 'john@example.com');
+
+TRANSLATION PROCESS:
+    Step 1: Find element by selector '#username'
+    Step 2: Verify it's a text input
+    Step 3: Click to focus
+    Step 4: Clear existing value
+    Step 5: Type text character by character
+    Step 6: Verify text was entered
+    Step 7: Trigger change event
+
+CDP MESSAGES SENT:
+
+Message 1: Find element
+    {
+        "id": 50,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.querySelector('#username')",
+            "returnByValue": false
+        }
+    }
+
+Message 2: Click to focus
+    {
+        "id": 51,
+        "method": "Input.dispatchMouseEvent",
+        "params": {
+            "type": "mousePressed",
+            "x": 200,
+            "y": 30,
+            "button": "left",
+            "clickCount": 1
+        }
+    }
+
+Message 3: Clear field (Ctrl+A, Delete)
+    {
+        "id": 52,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyDown",
+            "modifiers": 2,  // Ctrl
+            "key": "a"
+        }
+    }
+
+Message 4-30: Type each character (j, o, h, n, @, e, x, a, m, p, l, e, ., c, o, m)
+    {
+        "id": 53,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyDown",
+            "key": "j"
+        }
+    }
+    {
+        "id": 54,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyUp",
+            "key": "j"
+        }
+    }
+    // ... repeat for each character ...
+
+Message 31: Trigger change event
+    {
+        "id": 85,
+        "method": "Runtime.callFunctionOn",
+        "params": {
+            "functionDeclaration": "function() { this.dispatchEvent(new Event('change', {bubbles:true})); }",
+            "objectId": "input-element-12345"
+        }
+    }
+
+Events Browser Sends:
+    (Various input events)
+
+YOUR CODE RESUMES:
+    // Fill completed
+    // Next line executes
+
+
+================================================================================
+SECTION 2: LOCATOR RESOLUTION
+================================================================================
+
+EXAMPLE 4: FINDING ELEMENTS WITH DIFFERENT LOCATOR TYPES
+========================================================
+
+YOUR CODE - CSS Selector:
+    await page.locator('.product-link').click();
+
+Translation Steps:
+    1. Recognize CSS selector type
+    2. Compile selector engine
+    3. Create Runtime.evaluate command
+    4. Execute querySelector in browser
+    5. Retrieve element reference
+
+CDP MESSAGE:
+    {
+        "id": 100,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.querySelector('.product-link')",
+            "returnByValue": false
+        }
+    }
+
+Browser Response:
+    {
+        "id": 100,
+        "result": {
+            "type": "object",
+            "objectId": "element-99999",
+            "className": "HTMLAnchorElement"
+        }
+    }
+
+---
+
+YOUR CODE - XPath:
+    await page.locator('//a[@href]').click();
+
+Translation Steps:
+    1. Recognize XPath type
+    2. Compile XPath engine
+    3. Create Runtime.evaluate with XPath evaluator
+    4. Execute XPath in browser
+    5. Retrieve element reference
+
+CDP MESSAGE:
+    {
+        "id": 101,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.evaluate('//a[@href]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue",
+            "returnByValue": false
+        }
+    }
+
+---
+
+YOUR CODE - Text Content:
+    await page.locator('text=Add to Cart').click();
+
+Translation Steps:
+    1. Recognize text locator type
+    2. Compile text matcher
+    3. Search DOM for element with text
+    4. Match case sensitivity if specified
+    5. Retrieve element reference
+
+CDP MESSAGE:
+    {
+        "id": 102,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "Array.from(document.querySelectorAll('*')).find(el => el.textContent.includes('Add to Cart'))",
+            "returnByValue": false
+        }
+    }
+
+---
+
+YOUR CODE - Accessibility Role:
+    await page.locator('[role=\"button\"]').click();
+
+Translation Steps:
+    1. Recognize role locator type
+    2. Search by accessibility attributes
+    3. Match role in DOM
+
+CDP MESSAGE:
+    {
+        "id": 103,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.querySelector('[role=\"button\"]')",
+            "returnByValue": false
+        }
+    }
+
+
+================================================================================
+SECTION 3: ADVANCED ACTIONS
+================================================================================
+
+EXAMPLE 5: WAIT FOR ELEMENT
+===========================
+
+YOUR CODE (What you write):
+    await page.waitForSelector('.success-message', {timeout: 5000});
+
+TRANSLATION PROCESS:
+    Step 1: Parse selector '.success-message'
+    Step 2: Set timeout to 5000ms
+    Step 3: Start polling (or use mutation observer)
+    Step 4: Execute querySelector in browser repeatedly
+    Step 5: Check if element exists and is visible
+    Step 6: Either resolve (success) or reject (timeout)
+
+CDP MESSAGES SENT (Polling approach):
+
+First attempt (T=0ms):
+    {
+        "id": 200,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.querySelector('.success-message')",
+            "returnByValue": false
+        }
+    }
+
+Response (Not found):
+    { "id": 200, "result": { "value": null } }
+
+Second attempt (T=100ms):
+    {
+        "id": 201,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.querySelector('.success-message')"
+        }
+    }
+
+... polling continues until found or timeout ...
+
+Success (T=450ms):
+    {
+        "id": 220,
+        "result": {
+            "type": "object",
+            "objectId": "element-success"
+        }
+    }
+
+Promise resolves and test continues
+
+
+EXAMPLE 6: EVALUATE JAVASCRIPT IN PAGE
+======================================
+
+YOUR CODE (What you write):
+    const title = await page.evaluate(() => document.title);
+    const price = await page.evaluate(sel => 
+        document.querySelector(sel).textContent,
+        '.product-price'
+    );
+
+TRANSLATION - Simple evaluation:
+    
+CDP MESSAGE:
+    {
+        "id": 300,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.title",
+            "returnByValue": true
+        }
+    }
+
+Browser Response:
+    {
+        "id": 300,
+        "result": {
+            "type": "string",
+            "value": "DemoWebShop"
+        }
+    }
+
+JavaScript Promise Resolves:
+    title = "DemoWebShop"
+
+---
+
+TRANSLATION - With parameters:
+
+CDP MESSAGE:
+    {
+        "id": 301,
+        "method": "Runtime.callFunctionOn",
+        "params": {
+            "functionDeclaration": "(sel) => document.querySelector(sel).textContent",
+            "arguments": [
+                { "value": ".product-price" }
+            ],
+            "returnByValue": true
+        }
+    }
+
+Browser Response:
+    {
+        "id": 301,
+        "result": {
+            "type": "string",
+            "value": "$29.99"
+        }
+    }
+
+JavaScript Promise Resolves:
+    price = "$29.99"
+
+
+================================================================================
+SECTION 4: INPUT SIMULATION
+================================================================================
+
+EXAMPLE 7: KEYBOARD INPUT
+=========================
+
+YOUR CODE (What you write):
+    await page.press('#search', 'Enter');
+    await page.keyboard.type('Hello World');
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('A');
+    await page.keyboard.up('Shift');
+
+TRANSLATION - Press Enter:
+
+Step 1: Find element
+Step 2: Focus element
+Step 3: Send key down event
+Step 4: Send key up event
+
+CDP MESSAGES:
+
+Key down:
+    {
+        "id": 400,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyDown",
+            "key": "Enter",
+            "code": "Enter",
+            "nativeVirtualKeyCode": 13
+        }
+    }
+
+Key up:
+    {
+        "id": 401,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyUp",
+            "key": "Enter",
+            "code": "Enter",
+            "nativeVirtualKeyCode": 13
+        }
+    }
+
+---
+
+TRANSLATION - Type text:
+
+For each character 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd':
+
+    {
+        "id": 402,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyDown",
+            "key": "h",
+            "code": "KeyH",
+            "text": "H"
+        }
+    }
+    {
+        "id": 403,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyUp",
+            "key": "h",
+            "code": "KeyH"
+        }
+    }
+    // Repeat for each character
+
+---
+
+TRANSLATION - Modifier keys (Shift):
+
+Shift down:
+    {
+        "id": 410,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyDown",
+            "key": "Shift",
+            "code": "ShiftLeft",
+            "modifiers": 16  // Shift bit
+        }
+    }
+
+Type 'A' (with shift):
+    {
+        "id": 411,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyDown",
+            "key": "A",
+            "code": "KeyA",
+            "text": "A",
+            "modifiers": 16  // Shift is held
+        }
+    }
+
+Shift up:
+    {
+        "id": 412,
+        "method": "Input.dispatchKeyEvent",
+        "params": {
+            "type": "keyUp",
+            "key": "Shift",
+            "code": "ShiftLeft"
+        }
+    }
+
+
+EXAMPLE 8: MOUSE INPUT
+======================
+
+YOUR CODE (What you write):
+    await page.mouse.move(100, 200);
+    await page.mouse.down();
+    await page.mouse.move(200, 300);
+    await page.mouse.up();
+
+TRANSLATION PROCESS:
+    Step 1: Move to coordinates
+    Step 2: Press button (left button by default)
+    Step 3: Move while pressed
+    Step 4: Release button
+
+CDP MESSAGES:
+
+Move (no button):
+    {
+        "id": 500,
+        "method": "Input.dispatchMouseEvent",
+        "params": {
+            "type": "mouseMoved",
+            "x": 100,
+            "y": 200
+        }
+    }
+
+Down:
+    {
+        "id": 501,
+        "method": "Input.dispatchMouseEvent",
+        "params": {
+            "type": "mousePressed",
+            "x": 100,
+            "y": 200,
+            "button": "left",
+            "clickCount": 1
+        }
+    }
+
+Move while pressed:
+    {
+        "id": 502,
+        "method": "Input.dispatchMouseEvent",
+        "params": {
+            "type": "mouseMoved",
+            "x": 200,
+            "y": 300,
+            "button": "left"
+        }
+    }
+
+Up:
+    {
+        "id": 503,
+        "method": "Input.dispatchMouseEvent",
+        "params": {
+            "type": "mouseReleased",
+            "x": 200,
+            "y": 300,
+            "button": "left",
+            "clickCount": 1
+        }
+    }
+
+
+================================================================================
+SECTION 5: DIALOG & NAVIGATION HANDLING
+================================================================================
+
+EXAMPLE 9: HANDLE DIALOG BOX
+============================
+
+YOUR CODE (What you write):
+    page.once('dialog', dialog => dialog.accept('yes'));
+    await page.click('#confirm-btn');
+
+TRANSLATION PROCESS:
+    Step 1: Set up dialog listener
+    Step 2: Trigger action that causes dialog
+    Step 3: Browser shows dialog
+    Step 4: JavaScript responds with acceptance
+    Step 5: Continue test
+
+CDP MESSAGES:
+
+Setup listener (internal):
+    Browser sends event when dialog appears:
+    {
+        "method": "Page.javascriptDialogOpening",
+        "params": {
+            "url": "https://example.com/page",
+            "message": "Do you accept?",
+            "type": "confirm",
+            "hasBrowserHandler": true
+        }
+    }
+
+Respond to dialog:
+    {
+        "id": 600,
+        "method": "Page.handleJavaScriptDialog",
+        "params": {
+            "accept": true,
+            "promptText": "yes"
+        }
+    }
+
+Browser Response:
+    { "id": 600, "result": {} }
+
+
+EXAMPLE 10: NAVIGATION WAIT
+===========================
+
+YOUR CODE (What you write):
+    const response = await Promise.all([
+        page.waitForNavigation(),
+        page.click('a[href="/products"]')
+    ]);
+
+TRANSLATION PROCESS:
+    Step 1: Set up navigation listener
+    Step 2: Execute click action
+    Step 3: Wait for navigation events
+    Step 4: Resolve when navigation completes
+
+CDP EVENTS:
+
+Browser sends:
+    {
+        "method": "Page.navigationStarted",
+        "params": { "navigationId": "nav-123" }
+    }
+
+    {
+        "method": "Page.frameNavigated",
+        "params": { "frame": {...} }
+    }
+
+    {
+        "method": "Page.loadEventFired",
+        "params": { "timestamp": 1234567890 }
+    }
+
+    {
+        "method": "Page.frameStoppedLoading",
+        "params": { "frameId": "main-frame" }
+    }
+
+Your Promise resolves when frame stops loading
+
+
+================================================================================
+SECTION 6: NETWORK INTERCEPTION
+================================================================================
+
+EXAMPLE 11: INTERCEPT & ABORT REQUESTS
+======================================
+
+YOUR CODE (What you write):
+    await page.route('**/*.png', route => route.abort());
+    await page.goto('https://example.com');
+
+TRANSLATION PROCESS:
+    Step 1: Set up request route matcher
+    Step 2: Navigate to page
+    Step 3: Browser makes requests
+    Step 4: Server intercepts matching requests
+    Step 5: Server calls abort()
+    Step 6: Request is blocked
+
+CDP MESSAGES:
+
+Enable request interception:
+    {
+        "id": 700,
+        "method": "Fetch.enable",
+        "params": {
+            "patterns": [
+                {
+                    "urlPattern": "*.png",
+                    "requestStage": "HeadersReceived"
+                }
+            ]
+        }
+    }
+
+Browser sends intercepted request event:
+    {
+        "method": "Fetch.requestPaused",
+        "params": {
+            "requestId": "request-123",
+            "request": {
+                "url": "https://example.com/image.png",
+                "method": "GET",
+                "headers": {...}
+            }
+        }
+    }
+
+Abort the request:
+    {
+        "id": 701,
+        "method": "Fetch.failRequest",
+        "params": {
+            "requestId": "request-123",
+            "errorReason": "BlockedByClient"
+        }
+    }
+
+Browser Response:
+    { "id": 701, "result": {} }
+
+
+EXAMPLE 12: INTERCEPT & MODIFY RESPONSE
+=======================================
+
+YOUR CODE (What you write):
+    await page.route('**/api/products', route => 
+        route.fulfill({
+            status: 200,
+            body: JSON.stringify([{id: 1, name: 'Product'}])
+        })
+    );
+
+TRANSLATION PROCESS:
+    Step 1: Enable request interception
+    Step 2: Make request
+    Step 3: Intercept request/response
+    Step 4: Fulfill with custom response
+    Step 5: Page receives custom response
+
+CDP MESSAGES:
+
+Enable request interception:
+    {
+        "id": 800,
+        "method": "Fetch.enable",
+        "params": {
+            "patterns": [
+                {
+                    "urlPattern": "**/api/products",
+                    "requestStage": "HeadersReceived"
+                }
+            ]
+        }
+    }
+
+Browser sends request event:
+    {
+        "method": "Fetch.requestPaused",
+        "params": {
+            "requestId": "request-456",
+            "request": {
+                "url": "https://example.com/api/products",
+                "method": "GET"
+            }
+        }
+    }
+
+Fulfill with custom response:
+    {
+        "id": 801,
+        "method": "Fetch.fulfillRequest",
+        "params": {
+            "requestId": "request-456",
+            "responseCode": 200,
+            "responseHeaders": [
+                {"name": "Content-Type", "value": "application/json"}
+            ],
+            "body": "W3siaWQiOiAxLCAibmFtZSI6ICJQcm9kdWN0In1d"  // base64 encoded
+        }
+    }
+
+Browser Response:
+    { "id": 801, "result": {} }
+
+
+================================================================================
+SECTION 7: ASSERTION & VERIFICATION
+================================================================================
+
+EXAMPLE 13: ASSERTION - ELEMENT VISIBLE
+=======================================
+
+YOUR CODE (What you write):
+    await expect(page.locator('.success')).toBeVisible();
+
+TRANSLATION PROCESS:
+    Step 1: Find element
+    Step 2: Check visibility
+    Step 3: Compare with expected state
+    Step 4: Assert success or fail
+
+CDP MESSAGES:
+
+Find element:
+    {
+        "id": 900,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.querySelector('.success')"
+        }
+    }
+
+Check visibility:
+    {
+        "id": 901,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "el => { const rect = this.getBoundingClientRect(); return rect.display !== 'none' && rect.width > 0 && rect.height > 0; }"
+        }
+    }
+
+If visible:
+    ✓ Assertion passes
+    
+If not visible:
+    ✗ Assertion fails with error message
+    "expected element to be visible"
+
+
+EXAMPLE 14: ASSERTION - ELEMENT HAS TEXT
+========================================
+
+YOUR CODE (What you write):
+    await expect(page.locator('h1')).toContainText('Welcome');
+
+TRANSLATION PROCESS:
+    Step 1: Find element
+    Step 2: Get text content
+    Step 3: Compare with expected text
+    Step 4: Assert
+
+CDP MESSAGES:
+
+Find element:
+    {
+        "id": 1000,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.querySelector('h1')"
+        }
+    }
+
+Get text content:
+    {
+        "id": 1001,
+        "method": "Runtime.evaluate",
+        "params": {
+            "expression": "document.querySelector('h1').textContent"
+        }
+    }
+
+Browser Response:
+    {
+        "id": 1001,
+        "result": {
+            "type": "string",
+            "value": "Welcome to our store"
+        }
+    }
+
+JavaScript checks if text includes "Welcome":
+    ✓ 'Welcome to our store'.includes('Welcome') = true
+    ✓ Assertion passes
+
+
+================================================================================
+SECTION 8: SUMMARY TABLE
+================================================================================
+
+API CALL TO CDP TRANSLATION QUICK REFERENCE
+============================================
+
+┌──────────────────────┬────────────────────┬─────────────────────┐
+│ Playwright API       │ Primary CDP Method │ Additional CDP Calls │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.goto()          │ Page.navigate      │ Page.frameNavigated  │
+│                      │                    │ Page.loadEventFired  │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.click()         │ Input.dispatchME   │ DOM.getBoxModel     │
+│                      │                    │ Runtime.evaluate    │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.fill()          │ Input.dispatchKE   │ Runtime.callFunction │
+│                      │                    │ (for each char)     │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.waitForSelector │ Runtime.evaluate   │ (polling/observer)  │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.evaluate()      │ Runtime.evaluate   │ (JavaScript in page)│
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.keyboard.*      │ Input.dispatchKE   │ (repeat per key)    │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.mouse.*         │ Input.dispatchME   │ (repeat per action) │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.route()         │ Fetch.enable       │ Fetch.failRequest   │
+│                      │                    │ Fetch.fulfillReq    │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ expect().toBeVisible │ Runtime.evaluate   │ Check visibility    │
+├──────────────────────┼────────────────────┼─────────────────────┤
+│ page.goto() wait nav │ Page.navigate      │ Multiple events     │
+└──────────────────────┴────────────────────┴─────────────────────┘
+
+Legend:
+    ME = MouseEvent
+    KE = KeyEvent
+
+
+================================================================================
+SECTION 9: KEY INSIGHTS
+================================================================================
+
+IMPORTANT PATTERNS
+==================
+
+1. FINDING ELEMENTS
+   ├─ Always uses Runtime.evaluate
+   ├─ Browser executes querySelector/XPath
+   ├─ Returns element object reference
+   └─ Multiple methods: CSS, XPath, text, role
+
+2. CHECKING PROPERTIES
+   ├─ Uses DOM.getBoxModel for positions
+   ├─ Uses Runtime.evaluate for visibility
+   ├─ Uses Runtime.evaluate for text content
+   └─ Checks happen before actions
+
+3. SENDING INPUT
+   ├─ Each key press = 2 messages (down + up)
+   ├─ Each character requires separate messages
+   ├─ Mouse movement sends continuous updates
+   ├─ Modifiers (Shift, Ctrl) are flags
+
+4. WAITING FOR EVENTS
+   ├─ Browser sends unsolicited events
+   ├─ Server forwards events to test code
+   ├─ Promises resolve when events fire
+   └─ Timeouts prevent infinite wait
+
+5. INTERCEPTION
+   ├─ Server acts as proxy for requests
+   ├─ Can abort, modify, or mock responses
+   ├─ Transparent to page JavaScript
+   └─ Useful for testing error scenarios
+
+6. ASSERTIONS
+   ├─ Find element
+   ├─ Get expected property
+   ├─ Compare with actual value
+   ├─ Report pass/fail to test
+
+
+PERFORMANCE IMPLICATIONS
+========================
+
+High-overhead operations:
+    ├─ Filling long text (1 message per character)
+    ├─ Multiple consecutive operations (wait between)
+    ├─ Polling (waitForSelector repeats query)
+    └─ Network interception (adds latency)
+
+Optimized patterns:
+    ├─ Use parallel operations (Promise.all)
+    ├─ Use specific selectors (avoid scanning DOM)
+    ├─ Use built-in waits (less polling)
+    └─ Batch updates (reduce round-trips)
+
+
+================================================================================
+CONCLUSION
+================================================================================
+
+This document shows the complete translation process from:
+    Playwright API → JSON-RPC → WebSocket → CDP → Browser Execution
+
+Key takeaways:
+
+1. Every Playwright command becomes one or more CDP messages
+
+2. CDP uses JSON-RPC format with id matching for responses
+
+3. Messages are sent via persistent WebSocket connection
+
+4. Browser executes commands and returns results
+
+5. Events are sent asynchronously from browser to server
+
+6. Understanding this helps optimize test performance
+
+7. Debugging becomes easier when you know what's happening
+
+8. The abstraction layer hides 100+ lines of protocol work

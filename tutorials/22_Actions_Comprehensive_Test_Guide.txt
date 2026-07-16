@@ -1,0 +1,1339 @@
+================================================================================
+PLAYWRIGHT ACTIONS - COMPREHENSIVE TEST GUIDE
+================================================================================
+
+Reference: https://playwright.dev/docs/input
+Test File: tests/pw_actions_handling_html_elements.spec.ts
+Test Application: testautomationpractice.blogspot.com
+
+This guide provides a complete breakdown of all 16 test cases demonstrating
+every major Playwright action method with practical examples.
+
+
+================================================================================
+SECTION 1: FORM INPUT ACTIONS (TESTS 1-7)
+================================================================================
+
+These tests cover the most common actions for working with HTML form elements.
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 1: INPUT TEXTBOX - BASIC TEXT ENTRY & VALUE EXTRACTION
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Locating input elements by ID
+  • Verifying element visibility and enabled state
+  • Getting HTML attributes (getAttribute)
+  • Entering text with fill() action
+  • Retrieving entered text with inputValue()
+
+KEY METHODS DEMONSTRATED:
+  • page.locator('#id') - Find element by ID
+  • expect().toBeVisible() - Assert element visible
+  • expect().toBeEnabled() - Assert element enabled
+  • getAttribute('attribute') - Get HTML attribute value
+  • fill('text') - Enter text into input field
+  • inputValue() - Get the current value of input field
+
+PRACTICAL CODE EXAMPLE:
+  const nameInput = page.locator('#name');
+  await expect(nameInput).toBeVisible();
+  await expect(nameInput).toBeEnabled();
+  const maxLen = await nameInput.getAttribute('maxlength');
+  await nameInput.fill('John Doe');
+  const value = await nameInput.inputValue();
+  expect(value).toBe('John Doe');
+
+WHEN TO USE:
+  • Testing form field text input
+  • Validating field attributes (maxlength, placeholder, required)
+  • Filling out registration/login forms
+  • Testing search inputs
+  • Verifying user input is captured correctly
+
+COMMON MISTAKES:
+  ✗ Using textContent() instead of inputValue() on inputs
+    → textContent() returns empty for input fields
+  ✗ Not checking toBeVisible() before filling
+    → May fail if element is hidden
+  ✗ Using getAttribute() for value instead of inputValue()
+    → getAttribute('value') gets initial value, not current value
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 2: INPUT PASSWORD - SENSITIVE DATA HANDLING
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Handling password-type input fields
+  • Verifying field type attribute
+  • Filling and retrieving password values
+  • Understanding that inputValue() returns actual password (not masked)
+
+KEY METHODS DEMONSTRATED:
+  • getAttribute('type') - Verify input type is "password"
+  • fill() - Works on password fields just like text inputs
+  • inputValue() - Returns actual password value (not masked)
+
+PRACTICAL CODE EXAMPLE:
+  const passwordInput = page.locator('#inputPassword');
+  const type = await passwordInput.getAttribute('type');
+  expect(type).toBe('password');
+  await passwordInput.fill('SecurePass123!');
+  const pwd = await passwordInput.inputValue();
+  expect(pwd).toBe('SecurePass123!');
+
+WHEN TO USE:
+  • Testing login forms with password fields
+  • Testing password validation
+  • Testing password reset flows
+  • Testing password strength requirements
+  • Verifying authentication flows
+
+IMPORTANT NOTES:
+  • inputValue() returns the ACTUAL password (security consideration in code)
+  • In real tests, be careful with password hardcoding
+  • Consider using environment variables for sensitive test data
+  • Browser displays password as dots/asterisks, but test gets real value
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 3: INPUT EMAIL - TYPE-SPECIFIC INPUT FIELD
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Handling email-type input fields with HTML5 validation
+  • Verifying input type attribute
+  • Filling and validating email input
+  • Understanding type-specific input behavior
+
+KEY METHODS DEMONSTRATED:
+  • getAttribute('type') - Verify input type is "email"
+  • fill() - Enter email address
+  • inputValue() - Get entered email value
+  • HTML5 validation built into email inputs
+
+PRACTICAL CODE EXAMPLE:
+  const emailInput = page.locator('#inputEmail');
+  const type = await emailInput.getAttribute('type');
+  expect(type).toBe('email');
+  await emailInput.fill('user@example.com');
+  const email = await emailInput.inputValue();
+  expect(email).toBe('user@example.com');
+
+WHEN TO USE:
+  • Testing email input validation
+  • Testing form submission with email fields
+  • Testing email format validation
+  • Testing pre-filled email forms
+  • Verifying email field behavior
+
+HTML5 EMAIL VALIDATION:
+  • Modern browsers validate email format automatically
+  • Test the validation by accessing :invalid/:valid pseudo-classes
+  • Email inputs support HTML5 form validation attributes
+  • May have built-in validation messages
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 4: TEXTAREA - MULTI-LINE TEXT ENTRY
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Handling multi-line text input (textarea elements)
+  • Filling textarea with multiple lines
+  • Retrieving multi-line content preserving newlines
+  • Using toHaveValue() assertion helper
+
+KEY METHODS DEMONSTRATED:
+  • page.locator('#id') - Locate textarea element
+  • fill() - Works on textarea same as input elements
+  • inputValue() - Gets textarea content preserving newlines
+  • toHaveValue() - Convenient assertion for input values
+
+PRACTICAL CODE EXAMPLE:
+  const textarea = page.locator('#textarea');
+  const comments = 'Line 1\nLine 2\nLine 3';
+  await textarea.fill(comments);
+  const value = await textarea.inputValue();
+  expect(value).toBe(comments);
+  await expect(textarea).toHaveValue(comments);
+
+WHEN TO USE:
+  • Testing comment/feedback forms
+  • Testing description fields
+  • Testing message input areas
+  • Testing text editors
+  • Testing multi-line form fields
+
+KEY DIFFERENCES FROM INPUT:
+  • Textarea allows multiple lines of text
+  • Can have cols and rows attributes
+  • Often uses monospace font
+  • May have custom size/wrap attributes
+  • Preserve newline characters in values
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 5: RADIO BUTTONS - SINGLE SELECTION
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Selecting radio buttons with check() action
+  • Verifying radio button state with toBeChecked()
+  • Understanding mutual exclusivity (only one can be selected per group)
+  • Switching selections between radio buttons
+
+KEY METHODS DEMONSTRATED:
+  • page.locator('#id') - Locate radio button by ID
+  • check() - Select a radio button
+  • expect().toBeChecked() - Assert radio is selected
+  • expect().not.toBeChecked() - Assert radio is not selected
+  • isChecked() - Get radio button state as boolean
+
+PRACTICAL CODE EXAMPLE:
+  const maleRadio = page.locator('#male');
+  const femaleRadio = page.locator('#female');
+  
+  await maleRadio.check();
+  await expect(maleRadio).toBeChecked();
+  await expect(femaleRadio).not.toBeChecked();
+  
+  await femaleRadio.check();
+  await expect(femaleRadio).toBeChecked();
+  await expect(maleRadio).not.toBeChecked();
+
+WHEN TO USE:
+  • Testing gender/option selection forms
+  • Testing single-choice questionnaires
+  • Testing preference selection (color, size, etc.)
+  • Testing exclusive option selection
+  • Testing radio button toggle behavior
+
+MUTUAL EXCLUSIVITY CONCEPT:
+  • Radio buttons with same name attribute form a group
+  • Only ONE radio in group can be selected at a time
+  • Selecting one automatically deselects the other
+  • This is the KEY difference from checkboxes
+  • HTML groups them with name="groupName"
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 6: CHECKBOXES - MULTIPLE SELECTION
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Selecting checkboxes with check() action
+  • Deselecting checkboxes with uncheck() action
+  • Verifying multiple checkbox selection simultaneously
+  • Understanding that checkboxes are independent (unlike radio buttons)
+
+KEY METHODS DEMONSTRATED:
+  • check() - Select a checkbox
+  • uncheck() - Deselect a checkbox
+  • expect().toBeChecked() - Assert checkbox is selected
+  • expect().not.toBeChecked() - Assert checkbox is not selected
+  • isChecked() - Get checkbox state
+
+PRACTICAL CODE EXAMPLE:
+  const monCheckbox = page.locator('input[value="Monday"]');
+  const wedCheckbox = page.locator('input[value="Wednesday"]');
+  const tueCheckbox = page.locator('input[value="Tuesday"]');
+  
+  await monCheckbox.check();
+  await wedCheckbox.check();
+  
+  await expect(monCheckbox).toBeChecked();
+  await expect(wedCheckbox).toBeChecked();
+  await expect(tueCheckbox).not.toBeChecked();
+  
+  await monCheckbox.uncheck();
+  await expect(monCheckbox).not.toBeChecked();
+
+WHEN TO USE:
+  • Testing multi-select forms (pick all that apply)
+  • Testing permission checkboxes
+  • Testing feature toggles
+  • Testing preference selection
+  • Testing terms & conditions acceptance
+
+KEY DIFFERENCES FROM RADIO BUTTONS:
+  • Checkboxes are INDEPENDENT (no mutual exclusivity)
+  • Multiple checkboxes can be selected simultaneously
+  • Deselecting one doesn't affect others
+  • Use when users can choose multiple options
+  • Use uncheck() to deselect (not possible with radio buttons)
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 7: SELECT DROPDOWN - SELECTION METHODS
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Selecting dropdown options with selectOption()
+  • Getting selected value with inputValue()
+  • Getting selected option label text (textContent)
+  • Selecting by value attribute vs by displayed label
+  • Understanding difference between option value and label
+
+KEY METHODS DEMONSTRATED:
+  • selectOption('value') - Select option by value attribute
+  • selectOption({label: 'Text'}) - Select option by visible text
+  • inputValue() - Get the VALUE attribute of selected option
+  • textContent() - Get the LABEL text of selected option
+  • locator('option:checked') - Query the selected option
+
+PRACTICAL CODE EXAMPLE:
+  const countrySelect = page.locator('#country');
+  
+  // Select by value
+  await countrySelect.selectOption('in');
+  const value = await countrySelect.inputValue();
+  expect(value).toBe('in');
+  
+  // Get selected label
+  const label = await countrySelect
+    .locator('option:checked')
+    .textContent();
+  expect(label?.trim()).toBe('India');
+  
+  // Select by label
+  await countrySelect.selectOption({label: 'United States'});
+
+WHEN TO USE:
+  • Testing country/region selection
+  • Testing category selection
+  • Testing dropdown filters
+  • Testing size/color/option selection
+  • Testing form submission with dropdowns
+
+CRITICAL DISTINCTION:
+  • selectOption('value') selects by VALUE attribute
+  • selectOption({label: 'Text'}) selects by visible text
+  • inputValue() returns the VALUE (not the label)
+  • To get selected option's label: query option:checked then textContent()
+  • This is a common source of confusion
+
+
+================================================================================
+SECTION 2: CRITICAL CONCEPTS (TEST 8)
+================================================================================
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 8: inputValue() VS textContent() - DIRECT COMPARISON (CRITICAL)
+───────────────────────────────────────────────────────────────────────────────
+
+THIS IS THE MOST IMPORTANT TEST - PREVENTS COMMON FAILURES!
+
+WHAT IT TESTS:
+  • Demonstrates when to use inputValue() vs textContent()
+  • Shows what happens when you use the WRONG method
+  • Provides direct side-by-side comparison
+  • Covers multiple element types
+
+WHY THIS MATTERS:
+  Using the wrong method is one of the top causes of test failures!
+  Silent failures where tests get empty/null values instead of expected text.
+
+COMPARISON 1: FORM INPUT (text)
+────────────────────────────────
+HTML: <input id="name" type="text" value="hello">
+
+CORRECT METHOD: inputValue()
+  const value = await nameInput.inputValue();
+  // Returns: "hello" ✓
+
+WRONG METHOD: textContent()
+  const text = await nameInput.textContent();
+  // Returns: "" (empty) ✗
+
+COMPARISON 2: BUTTON ELEMENT
+────────────────────────────
+HTML: <button id="btn">Click Me</button>
+
+WRONG METHOD: inputValue()
+  const value = await button.inputValue();
+  // Returns: null ✗ (not a form input)
+
+CORRECT METHOD: textContent()
+  const text = await button.textContent();
+  // Returns: "Click Me" ✓
+
+COMPARISON 3: SELECT DROPDOWN
+─────────────────────────────
+HTML: <select id="country">
+        <option value="in">India</option>
+        <option value="us">United States</option>
+      </select>
+
+For SELECTED OPTION VALUE:
+  const value = await select.inputValue();
+  // Returns: "in" ✓ (the value attribute)
+
+For ALL OPTIONS TEXT:
+  const allText = await select.textContent();
+  // Returns: "India United States" (all option texts)
+
+For SELECTED OPTION LABEL ONLY:
+  const label = await select.locator('option:checked').textContent();
+  // Returns: "India" ✓ (only selected option text)
+
+QUICK REFERENCE TABLE
+─────────────────────────────────────────────────────────────────────────────
+Element Type           | To Get           | Use This           | Result
+─────────────────────────────────────────────────────────────────────────────
+<input type="text">    | Entered text     | inputValue()       | "text" ✓
+<input type="text">    | Entered text     | textContent()      | "" ✗
+<textarea>             | Text content     | inputValue()       | "text" ✓
+<textarea>             | Text content     | textContent()      | "" ✗
+<select>               | Selected value   | inputValue()       | "value" ✓
+<select>               | All option text  | textContent()      | "opt1opt2..." ✓
+<button>               | Button label     | textContent()      | "Click" ✓
+<button>               | Button label     | inputValue()       | null ✗
+<a href="...">Link</a> | Link text        | textContent()      | "Link" ✓
+<div>Text</div>        | Div text         | textContent()      | "Text" ✓
+<p>Paragraph</p>       | Paragraph text   | textContent()      | "Para..." ✓
+─────────────────────────────────────────────────────────────────────────────
+
+DECISION FLOWCHART
+──────────────────
+
+  Is it a FORM INPUT?
+    (<input>, <textarea>, <select>)
+    └─ YES → Use inputValue() ✓
+    └─ NO → Use textContent() ✓
+
+  Exception: For selected DROPDOWN OPTION label (not value)
+    └─ Query option:checked then use textContent()
+
+PRACTICAL TESTING EXAMPLE:
+
+  // Test 1: Form input field
+  const nameField = page.locator('#name');
+  await nameField.fill('John');
+  
+  ✓ Correct:   expect(await nameField.inputValue()).toBe('John');
+  ✗ Wrong:     expect(await nameField.textContent()).toBe('John');
+              → Will fail: expects 'John' but got ''
+
+  // Test 2: Button
+  const submitBtn = page.locator('button[type="submit"]');
+  
+  ✓ Correct:   expect(await submitBtn.textContent()).toContain('Submit');
+  ✗ Wrong:     expect(await submitBtn.inputValue()).toBe('Submit');
+              → Will fail: expects 'Submit' but got null
+
+  // Test 3: Dropdown
+  const select = page.locator('#country');
+  await select.selectOption('us');
+  
+  ✓ Correct (get value):  expect(await select.inputValue()).toBe('us');
+  ✓ Correct (get label):  expect(await select
+                            .locator('option:checked')
+                            .textContent()).toContain('United States');
+  ✗ Wrong:   expect(await select.textContent()).toBe('us');
+            → Will fail: textContent() returns all option texts
+
+SUMMARY
+───────
+  • inputValue() = Get the VALUE attribute of form inputs
+  • textContent() = Get the displayed text of any element
+  • Using wrong method = silent test failures
+  • Check the quick reference table when uncertain
+
+
+================================================================================
+SECTION 3: INTERACTION ACTIONS (TESTS 9-12)
+================================================================================
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 9: CLICK ACTIONS - SINGLE, DOUBLE, RIGHT-CLICK
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Single left mouse click
+  • Double-click action
+  • Right-click (context menu)
+  • Click with options (modifiers, delay, position)
+
+KEY METHODS DEMONSTRATED:
+  • click() - Single left click
+  • dblclick() - Double click
+  • click({button: 'right'}) - Right-click
+  • click({modifiers: ['Control']}) - Click with keyboard modifier
+  • click({delay: 500}) - Click with delay between down and up
+
+PRACTICAL CODE EXAMPLES:
+
+  // Single click
+  await button.click();
+
+  // Double click
+  await element.dblclick();
+
+  // Right-click (context menu)
+  await element.click({button: 'right'});
+
+  // Click with modifier keys
+  await item.click({modifiers: ['Control']}); // Ctrl+click
+  await item.click({modifiers: ['Shift']});   // Shift+click
+  await item.click({modifiers: ['Meta']});    // Cmd+click (Mac)
+
+  // Click with delay
+  await button.click({delay: 500});
+
+  // Click at specific position within element
+  await button.click({position: {x: 50, y: 25}});
+
+  // Multiple clicks
+  await element.click({clickCount: 3});
+
+WHEN TO USE:
+  • Testing button clicks
+  • Testing link navigation
+  • Testing context menus
+  • Testing multi-select with Ctrl+click
+  • Testing range selection with Shift+click
+  • Testing special behaviors on different click types
+
+ACTIONABILITY CHECKS:
+  click() automatically:
+    1. Waits for element to be visible
+    2. Waits for element to be enabled
+    3. Scrolls element into view if needed
+    4. Waits for no overlapping elements
+    5. Triggers all appropriate events
+
+COMMON MISTAKES:
+  ✗ Not checking actionability before clicking
+  ✗ Forgetting that click() waits for visibility
+  ✗ Using force: true unnecessarily (disables checks)
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 10: KEYBOARD ACTIONS - pressSequentially VS PRESS
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • pressSequentially() for character-by-character typing
+  • press() for specific keyboard keys
+  • Keyboard shortcuts with modifiers
+  • Difference between fill() and pressSequentially()
+
+KEY METHODS DEMONSTRATED:
+  • pressSequentially(text, {delay: ms}) - Type with character events
+  • press(key) - Press specific key name
+  • Key modifiers: 'Control+a', 'Shift+Tab', 'Meta+s', etc.
+
+FILL() VS pressSequentially()
+──────────────────────────────
+
+fill() - Recommended for most cases
+  • Fast typing simulation
+  • Clears existing text first
+  • Triggers single input event
+  • Good for: Normal form filling
+  • Speed: Very fast
+
+  await field.fill('text');
+
+pressSequentially() - For special handlers
+  • Slow, character-by-character typing
+  • Configurable delay between characters
+  • Triggers keydown/keyup for each character
+  • Good for: Autocomplete, validation, input handlers
+  • Speed: Slow (but more realistic)
+
+  await field.pressSequentially('text', {delay: 100});
+
+PRACTICAL CODE EXAMPLES:
+
+  // Basic typing with pressSequentially
+  const searchInput = page.locator('#search');
+  await searchInput.pressSequentially('React', {delay: 100});
+
+  // Press Backspace
+  await field.press('Backspace');
+
+  // Press Enter (submit)
+  await field.press('Enter');
+
+  // Press Tab (move to next field)
+  await field.press('Tab');
+
+  // Keyboard shortcuts
+  await field.press('Control+a');      // Select all
+  await field.press('Control+c');      // Copy
+  await field.press('Control+v');      // Paste
+  await field.press('Control+z');      // Undo
+  await field.press('Meta+s');         // Save (Mac)
+
+  // Arrow keys
+  await field.press('ArrowUp');
+  await field.press('ArrowDown');
+  await field.press('ArrowLeft');
+  await field.press('ArrowRight');
+
+WHEN TO USE pressSequentially():
+  • Testing autocomplete handlers
+  • Testing character-by-character validation
+  • Testing input field event handlers
+  • Testing real-time suggestions
+  • Testing keyboard-specific behaviors
+
+KEY PRESS NAMES:
+  Special Keys: 'Enter', 'Escape', 'Backspace', 'Delete', 'Tab', 'Space'
+  Navigation: 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'
+  Page: 'PageUp', 'PageDown', 'Home', 'End'
+  Character: 'a', 'A', '1', '@' (for single keys)
+  Modifiers: 'Control+', 'Shift+', 'Alt+', 'Meta+'
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 11: FOCUS AND BLUR - FOCUS MANAGEMENT
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Using focus() to set focus on element
+  • Using blur() to remove focus
+  • Testing focus-dependent behaviors
+  • Testing form validation on blur event
+
+KEY METHODS DEMONSTRATED:
+  • focus() - Set focus to element
+  • blur() - Remove focus from element
+  • isFocused() - Check if element has focus (limited support)
+  • evaluate() - Check document.activeElement
+
+PRACTICAL CODE EXAMPLES:
+
+  // Set focus
+  await field.focus();
+
+  // Check if focused (using evaluate)
+  const hasFocus = await field.evaluate((el) => {
+    return document.activeElement === el;
+  });
+
+  // Remove focus
+  await field.blur();
+
+  // Check if NOT focused
+  const notFocused = await field.evaluate((el) => {
+    return document.activeElement !== el;
+  });
+
+TESTING VALIDATION ON BLUR:
+
+  const emailField = page.locator('#email');
+
+  // Focus on field
+  await emailField.focus();
+
+  // Enter invalid data
+  await emailField.fill('invalid-email');
+
+  // Blur triggers validation
+  await emailField.blur();
+
+  // Check for error message
+  const error = page.locator('.error-message');
+  await expect(error).toBeVisible();
+
+WHEN TO USE focus()/blur():
+  • Testing form validation on blur
+  • Testing focus-dependent styling
+  • Testing focus order (tab navigation)
+  • Testing focus-dependent JavaScript
+  • Testing focus management in complex UIs
+  • Testing autocomplete on focus
+
+COMMON USE CASES:
+  • Many modern forms validate on blur
+  • Focus outlines for accessibility
+  • Auto-opening dropdowns on focus
+  • Required field highlighting
+  • Focus-trap testing (modal dialogs)
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 12: HOVER ACTIONS - MOUSE HOVER
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Using hover() to move mouse over element
+  • Testing hover-dependent UI changes
+  • Testing tooltips on hover
+  • Testing dropdown menus on hover
+
+KEY METHODS DEMONSTRATED:
+  • hover() - Move mouse over element without clicking
+  • hover({position: {x, y}}) - Hover at specific position
+
+PRACTICAL CODE EXAMPLES:
+
+  // Basic hover
+  await button.hover();
+
+  // Hover and check tooltip visibility
+  const tooltip = page.locator('.tooltip');
+  await button.hover();
+  await expect(tooltip).toBeVisible();
+
+  // Hover and check dropdown appears
+  const menu = page.locator('.dropdown-menu');
+  await navItem.hover();
+  await expect(menu).toBeVisible();
+
+WHAT HOVER() TRIGGERS:
+  • pointerover event
+  • pointermove event
+  • mouseenter event
+  • mouseover event
+
+WHEN TO USE hover():
+  • Testing tooltips
+  • Testing dropdown menus
+  • Testing hover-based UI changes
+  • Testing hover styling
+  • Testing hover-triggered content
+
+PRACTICAL SCENARIOS:
+  • E-commerce: Show additional product info on hover
+  • Dashboards: Display detailed stats on hover
+  • Navigation: Show submenu on hover
+  • Tables: Highlight row on hover
+  • Buttons: Show tooltip or secondary text on hover
+
+TESTING PATTERN:
+
+  test('tooltip appears on hover', async ({ page }) => {
+    const button = page.locator('[data-test="help-button"]');
+    const tooltip = page.locator('[data-test="tooltip"]');
+
+    // Initially hidden
+    await expect(tooltip).not.toBeVisible();
+
+    // Hover to show
+    await button.hover();
+    await expect(tooltip).toBeVisible();
+
+    // Check tooltip content
+    await expect(tooltip).toHaveText('Help text here');
+  });
+
+
+================================================================================
+SECTION 4: UTILITY ACTIONS (TESTS 13-16)
+================================================================================
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 13: SCROLL ACTIONS - SCROLLING
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Automatic scrolling (built into actions)
+  • Explicit scrollIntoViewIfNeeded()
+  • Manual page scrolling
+  • Mouse wheel scrolling
+
+KEY METHODS DEMONSTRATED:
+  • scrollIntoViewIfNeeded() - Scroll element into viewport if needed
+  • page.evaluate() - Custom scroll with JavaScript
+  • page.mouse.wheel() - Mouse wheel scroll
+
+PRACTICAL CODE EXAMPLES:
+
+  // Automatic (built into fill, click, etc.)
+  await field.fill('text'); // Auto-scrolls if needed
+
+  // Explicit scroll
+  await field.scrollIntoViewIfNeeded();
+
+  // Scroll page with JavaScript
+  await page.evaluate(() => window.scrollBy(0, 500)); // Scroll down 500px
+  await page.evaluate(() => window.scrollTo(0, 1000)); // Scroll to position
+
+  // Scroll element with JavaScript
+  await page.evaluate(selector => {
+    document.querySelector(selector).scrollIntoView();
+  }, '#element-id');
+
+  // Mouse wheel scroll
+  await page.mouse.wheel(0, 500); // Scroll down
+
+WHEN TO USE EXPLICIT SCROLLING:
+  • Element is off-screen before action
+  • Testing scroll-dependent behaviors
+  • Testing lazy-loading
+  • Testing infinite scroll
+  • Testing scroll position
+
+TESTING SCROLL BEHAVIOR PATTERN:
+
+  test('lazy loaded content appears on scroll', async ({ page }) => {
+    await page.goto('/');
+
+    // Initially, item is not visible
+    const item = page.locator('#lazy-loaded-item');
+    let isVisible = await item.isVisible();
+    expect(isVisible).toBe(false);
+
+    // Scroll page to reveal item
+    await page.evaluate(() => {
+      document.querySelector('#lazy-loaded-item')
+        .scrollIntoView();
+    });
+
+    // Now item is visible
+    await expect(item).toBeVisible();
+  });
+
+KEY DIFFERENCE - scrollIntoViewIfNeeded():
+  • "if needed" means it only scrolls if necessary
+  • If element is already visible, no scroll happens
+  • Efficient for performance
+  • Built-in to most actions (fill, click, etc.)
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 14: FILE UPLOAD - setInputFiles
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Uploading single file using setInputFiles()
+  • Uploading multiple files
+  • Creating file buffer in memory
+  • File input handling without dialog
+
+KEY METHODS DEMONSTRATED:
+  • setInputFiles(path) - Set file input with file path
+  • setInputFiles([path1, path2]) - Multiple files
+  • setInputFiles({name, mimeType, buffer}) - File buffer
+
+PRACTICAL CODE EXAMPLES:
+
+  // Single file upload from disk
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles('./documents/resume.pdf');
+
+  // Multiple file upload
+  await fileInput.setInputFiles([
+    './documents/resume.pdf',
+    './documents/cover-letter.pdf'
+  ]);
+
+  // File from memory buffer
+  await fileInput.setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Test file content')
+  });
+
+  // Multiple files with mixed sources
+  await fileInput.setInputFiles([
+    './real-file.pdf',
+    {
+      name: 'generated.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Generated content')
+    }
+  ]);
+
+  // Clear files
+  await fileInput.setInputFiles([]);
+
+WHY SETINPUTFILES() IS BETTER THAN DIALOG:
+  • Much faster than file picker dialog
+  • No flakiness from dialog handling
+  • Works across all browsers reliably
+  • Can create test files in memory
+  • Doesn't require actual file on disk
+
+WHEN TO USE:
+  • Testing file upload forms
+  • Testing document upload
+  • Testing image upload
+  • Testing batch file operations
+  • Testing file validation
+
+PRACTICAL SCENARIOS:
+  • Profile picture upload
+  • Resume/CV upload
+  • Document submission
+  • Image gallery upload
+  • Batch data import (CSV, Excel)
+
+TESTING FILE UPLOAD PATTERN:
+
+  test('upload resume and validate', async ({ page }) => {
+    const fileInput = page.locator('input[type="file"]');
+    const submitBtn = page.locator('button[type="submit"]');
+
+    // Upload file
+    await fileInput.setInputFiles('./test-files/resume.pdf');
+
+    // Verify file was selected (check for file name display)
+    const fileName = page.locator('.file-name');
+    await expect(fileName).toHaveText('resume.pdf');
+
+    // Submit form
+    await submitBtn.click();
+
+    // Verify success
+    const success = page.locator('.success-message');
+    await expect(success).toBeVisible();
+  });
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 15: DRAG AND DROP - dragTo METHOD
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Dragging element to another element's position
+  • Simulating drop operation
+  • Testing drag-dependent behaviors
+
+KEY METHODS DEMONSTRATED:
+  • dragTo(target) - Drag source element to target position
+  • Manual drag using mouse.down(), mouse.move(), mouse.up()
+
+PRACTICAL CODE EXAMPLES:
+
+  // Simple drag and drop
+  const source = page.locator('#drag-item');
+  const target = page.locator('#drop-zone');
+  await source.dragTo(target);
+
+  // Manual drag with more control
+  const item = page.locator('#item');
+  const zone = page.locator('#zone');
+
+  await item.hover();
+  await page.mouse.down();
+  await zone.hover();
+  await page.mouse.up();
+
+WHEN TO USE:
+  • Testing reordering (list items, cards)
+  • Testing Kanban boards
+  • Testing drag-drop upload
+  • Testing UI rearrangement
+  • Testing drag-dependent features
+
+PRACTICAL SCENARIOS:
+  • Reorder items in list
+  • Drag item to different column (Kanban)
+  • Drag file onto drop zone
+  • Drag to move element position
+  • Drag to select multiple items
+
+TESTING DRAG-DROP PATTERN:
+
+  test('reorder list items', async ({ page }) => {
+    await page.goto('/');
+
+    const item1 = page.locator('.item', {hasText: 'Item 1'});
+    const item2 = page.locator('.item', {hasText: 'Item 2'});
+
+    // Initial order check
+    const items = page.locator('.item');
+    const first = await items.nth(0).textContent();
+    expect(first).toContain('Item 1');
+
+    // Drag item1 below item2
+    await item1.dragTo(item2);
+
+    // Verify new order
+    const newFirst = await items.nth(0).textContent();
+    expect(newFirst).toContain('Item 2');
+  });
+
+
+───────────────────────────────────────────────────────────────────────────────
+TEST 16: ATTRIBUTE RETRIEVAL - getAttribute
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT TESTS:
+  • Getting HTML attributes with getAttribute()
+  • Validating attribute values
+  • Testing data attributes
+  • Testing accessibility attributes
+
+KEY METHODS DEMONSTRATED:
+  • getAttribute(name) - Get HTML attribute value
+  • getAttribute() returns string or null
+
+PRACTICAL CODE EXAMPLES:
+
+  const input = page.locator('#email');
+
+  // Get standard attributes
+  const type = await input.getAttribute('type');
+  const placeholder = await input.getAttribute('placeholder');
+  const className = await input.getAttribute('class');
+
+  // Get data attributes
+  const testId = await input.getAttribute('data-testid');
+  const customData = await input.getAttribute('data-custom');
+
+  // Get accessibility attributes
+  const ariaLabel = await input.getAttribute('aria-label');
+  const ariaRequired = await input.getAttribute('aria-required');
+
+  // Check if attribute exists
+  const required = await input.getAttribute('required');
+  if (required !== null) {
+    console.log('Field is required');
+  }
+
+COMMON ATTRIBUTES TO TEST:
+
+  Form Attributes:
+    • type: input type (text, email, password, etc.)
+    • disabled: element is disabled
+    • required: field is required
+    • maxlength: maximum input length
+    • pattern: regex pattern for validation
+    • placeholder: placeholder text
+
+  Accessibility Attributes:
+    • aria-label: accessibility label
+    • aria-required: field is required
+    • aria-disabled: element is disabled
+    • aria-invalid: field has invalid value
+    • role: element role
+
+  Custom Attributes:
+    • data-testid: testing identifier
+    • data-custom: custom data
+    • data-value: custom value
+
+  HTML5 Attributes:
+    • data-*: custom data attributes
+    • class: CSS classes
+    • id: element ID
+    • style: inline styles
+
+TESTING ATTRIBUTES PATTERN:
+
+  test('validate input field attributes', async ({ page }) => {
+    const emailField = page.locator('#email');
+
+    // Validate type
+    const type = await emailField.getAttribute('type');
+    expect(type).toBe('email');
+
+    // Validate required
+    const required = await emailField.getAttribute('required');
+    expect(required).not.toBeNull();
+
+    // Validate maxlength
+    const maxLen = await emailField.getAttribute('maxlength');
+    expect(maxLen).toBe('50');
+
+    // Validate placeholder
+    const placeholder = await emailField.getAttribute('placeholder');
+    expect(placeholder).toBe('Enter email address');
+
+    // Validate data-testid
+    const testId = await emailField.getAttribute('data-testid');
+    expect(testId).toBe('email-input');
+  });
+
+WHEN TO USE getAttribute():
+  • Validating HTML structure
+  • Testing required attributes
+  • Testing accessibility attributes
+  • Testing input constraints (maxlength, pattern)
+  • Testing data attributes
+  • Testing custom attributes
+
+
+================================================================================
+SECTION 5: SUMMARY AND QUICK REFERENCE
+================================================================================
+
+COMPLETE ACTION METHODS REFERENCE
+
+TEXT INPUT:
+  fill(text)                    Fast typing, clears existing, recommended
+  pressSequentially(text)       Slow typing, char-by-char events, handlers
+  type(text)                    Type method (alternative to fill)
+
+INTERACTION:
+  click()                       Single left click
+  dblclick()                    Double click
+  click({button: 'right'})      Right-click
+  check()                       Select checkbox/radio
+  uncheck()                     Deselect checkbox
+  selectOption(value)           Select dropdown option
+
+KEYBOARD:
+  press(key)                    Press keyboard key
+  pressSequentially(text)       Type with character events
+
+FOCUS:
+  focus()                       Set focus on element
+  blur()                        Remove focus
+
+HOVER:
+  hover()                       Move mouse over element
+
+SCROLL:
+  scrollIntoViewIfNeeded()      Auto scroll into view
+  page.evaluate()               Custom JavaScript scroll
+  page.mouse.wheel()            Mouse wheel scroll
+
+FILE/DRAG:
+  setInputFiles(path)           Upload file
+  dragTo(target)                Drag to target
+
+VALUE RETRIEVAL:
+  inputValue()                  Get form input value
+  textContent()                 Get element text
+  getAttribute(name)            Get HTML attribute
+
+ASSERTIONS:
+  toBeVisible()                 Assert element visible
+  toBeEnabled()                 Assert element enabled
+  toBeChecked()                 Assert checkbox checked
+  toHaveValue(value)            Assert input value
+  toHaveText(text)              Assert element text
+
+
+TESTING PATTERNS REFERENCE
+
+Pattern: Test Form Filling
+────────────────────────────
+  const nameField = page.locator('#name');
+  await nameField.fill('John Doe');
+  const value = await nameField.inputValue();
+  expect(value).toBe('John Doe');
+
+Pattern: Test Selection
+────────────────────────
+  const checkbox = page.locator('#accept-terms');
+  await checkbox.check();
+  await expect(checkbox).toBeChecked();
+
+Pattern: Test Dropdown
+──────────────────────
+  const select = page.locator('#country');
+  await select.selectOption('us');
+  const value = await select.inputValue();
+  expect(value).toBe('us');
+
+Pattern: Test Click
+───────────────────
+  const button = page.locator('button[type="submit"]');
+  await expect(button).toBeEnabled();
+  await button.click();
+
+Pattern: Test Hover Tooltip
+──────────────────────────
+  const trigger = page.locator('[data-test="help"]');
+  const tooltip = page.locator('[data-test="tooltip"]');
+  await trigger.hover();
+  await expect(tooltip).toBeVisible();
+
+Pattern: Test Keyboard
+──────────────────────
+  await field.fill('');
+  await field.pressSequentially('search', {delay: 100});
+  await field.press('Enter');
+
+Pattern: Test Focus Validation
+───────────────────────────────
+  const emailField = page.locator('#email');
+  await emailField.fill('invalid');
+  await emailField.blur();
+  const error = page.locator('.error');
+  await expect(error).toBeVisible();
+
+Pattern: Test File Upload
+─────────────────────────
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles('./file.pdf');
+  const fileName = page.locator('.file-name');
+  await expect(fileName).toHaveText('file.pdf');
+
+
+DECISION TREES
+
+When to use which INPUT METHOD?
+─────────────────────────────────
+  Need to enter text in form field?
+    └─ Just filling normal form?       → Use fill()
+    └─ Testing autocomplete handler?   → Use pressSequentially()
+    └─ Testing input validation?       → Use pressSequentially()
+
+When to use which VALUE RETRIEVAL?
+──────────────────────────────────────
+  Need to get value from element?
+    └─ Is it a form input?             → Use inputValue()
+    └─ Is it another element?          → Use textContent()
+    └─ Is it HTML attribute?           → Use getAttribute()
+    └─ Is it selected dropdown label?  → Use textContent() on option:checked
+
+When to use click() vs other methods?
+──────────────────────────────────────
+  Need to interact with element?
+    └─ Click button/link?              → Use click()
+    └─ Select checkbox/radio?          → Use check()/uncheck()
+    └─ Select dropdown option?         → Use selectOption()
+    └─ Type in text field?             → Use fill()
+    └─ Trigger hover state?            → Use hover()
+
+
+================================================================================
+COMMON MISTAKES AND HOW TO FIX THEM
+================================================================================
+
+MISTAKE 1: Using textContent() on input field
+──────────────────────────────────────────────
+❌ WRONG:
+  const value = await input.textContent();
+  expect(value).toBe('test');  // FAILS: empty string
+
+✅ CORRECT:
+  const value = await inputValue();
+  expect(value).toBe('test');
+
+FIX: Use inputValue() for form inputs
+
+
+MISTAKE 2: Using inputValue() on button
+─────────────────────────────────────────
+❌ WRONG:
+  const text = await button.inputValue();
+  expect(text).toBe('Click Me');  // FAILS: null
+
+✅ CORRECT:
+  const text = await button.textContent();
+  expect(text).toContain('Click Me');
+
+FIX: Use textContent() for non-form elements
+
+
+MISTAKE 3: Not waiting for actionability
+──────────────────────────────────────────
+❌ WRONG:
+  await page.goto('/');
+  await button.click();  // May fail if not ready
+
+✓ BETTER:
+  await page.goto('/');
+  await expect(button).toBeVisible();
+  await expect(button).toBeEnabled();
+  await button.click();
+
+FIX: click() checks by default, but verify visibility first
+
+
+MISTAKE 4: Using pressSequentially() when fill() is fine
+──────────────────────────────────────────────────────────
+❌ SLOW:
+  await field.pressSequentially('test email text', {delay: 100});  // Very slow
+
+✅ FAST:
+  await field.fill('test email text');  // Much faster
+
+FIX: Use fill() for normal form filling, pressSequentially() only when needed
+
+
+MISTAKE 5: Not checking focus before testing focus behavior
+─────────────────────────────────────────────────────────────
+❌ INCOMPLETE:
+  await field.focus();
+  // No check if focus worked
+
+✅ COMPLETE:
+  await field.focus();
+  const hasFocus = await field.evaluate((el) => 
+    document.activeElement === el
+  );
+  expect(hasFocus).toBe(true);
+
+FIX: Verify focus was set with evaluate()
+
+
+MISTAKE 6: Forgetting drag needs source AND target
+───────────────────────────────────────────────────
+❌ WRONG:
+  await item.dragTo();  // No target!
+
+✅ CORRECT:
+  const source = page.locator('#item');
+  const target = page.locator('#zone');
+  await source.dragTo(target);
+
+FIX: Provide both source and target elements
+
+
+MISTAKE 7: Using getAttribute('value') for current input value
+──────────────────────────────────────────────────────────────
+❌ WRONG:
+  await field.fill('new value');
+  const val = await field.getAttribute('value');
+  // Gets initial value, not current value!
+
+✅ CORRECT:
+  await field.fill('new value');
+  const val = await field.inputValue();
+  // Gets current value
+
+FIX: Use inputValue() for current value, getAttribute('value') for initial
+
+
+MISTAKE 8: Not clearing input before testing new value
+──────────────────────────────────────────────────────
+❌ WRONG:
+  await field.fill('first value');
+  // ...later...
+  await field.fill('second value');
+  // fill() clears automatically, this is fine
+
+✓ SAFE:
+  // fill() always clears first, so this is safe
+  await field.fill('new value');
+
+FIX: fill() clears automatically, so just use it directly
+
+
+================================================================================
+CONCLUSION
+================================================================================
+
+This comprehensive test suite covers all major Playwright actions:
+  • 8 tests for form inputs (text, password, email, textarea, radio, checkbox, dropdown, comparison)
+  • 4 tests for interaction methods (click, keyboard, focus, hover)
+  • 4 tests for utility methods (scroll, file upload, drag-drop, attributes)
+
+The most critical concept to master is TEST 8: inputValue() vs textContent()
+
+Use this guide as reference when:
+  • Writing tests for web applications
+  • Debugging failing tests
+  • Learning Playwright test automation
+  • Choosing the right action method
+  • Understanding element interaction
+
+
+KEY TAKEAWAYS
+─────────────
+
+1. fill() is the default method for entering text - use it 90% of the time
+2. inputValue() is for form inputs ONLY (<input>, <textarea>, <select>)
+3. textContent() is for ANY element (button, div, span, etc.)
+4. click() automatically handles visibility and scrolling
+5. focus() and blur() test form validation behaviors
+6. hover() tests UI changes on mouse over
+7. pressSequentially() is slower but tests keyboard handlers
+8. setInputFiles() avoids flaky file picker dialogs
+9. dragTo() simulates drag-and-drop interactions
+10. getAttribute() validates HTML structure and attributes
+
+This guide combined with the test file provides everything needed to master
+Playwright test automation for web applications.

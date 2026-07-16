@@ -1,0 +1,1044 @@
+================================================================================
+WORKERS & PARALLELIZATION - INTERVIEW QUESTIONS & ANSWERS
+Tutorial: 08_Workers_And_Parallelization_Interview_Questions.txt
+================================================================================
+
+================================================================================
+SECTION 1: BASIC CONCEPTS (Entry Level)
+================================================================================
+
+Q1: What is a worker in Playwright testing?
+
+A: A worker is an independent Node.js process that Playwright spawns to execute
+tests in parallel. Each worker:
+  ✓ Has its own browser instance
+  ✓ Has its own memory space
+  ✓ Runs independently from other workers
+  ✓ Can execute multiple tests sequentially
+
+Think of workers as separate machines, each running tests one after another,
+but multiple workers run different tests simultaneously.
+
+
+Q2: What does "fullyParallel: true" mean in Playwright config?
+
+A: It means ALL tests run in parallel across all available workers, rather than
+running tests sequentially within each worker.
+
+Default behavior (fullyParallel: false):
+  - Worker 1: test1, test2, test3 (sequential)
+  - Worker 2: test4, test5, test6 (sequential)
+  - Maximum parallelism: limited
+
+With fullyParallel: true:
+  - Worker 1: test1
+  - Worker 2: test2
+  - Worker 3: test3
+  - Worker 4: test4
+  - Maximum parallelism: all tests run simultaneously
+
+
+Q3: How many workers should I use?
+
+A: The default (workers: undefined) is usually optimal.
+
+  workers: undefined
+    → Auto-detects CPU cores
+    → 6-core machine = 6 workers
+    → 4-core machine = 4 workers
+    → Adapts to your hardware
+
+General rule: workers ≈ number of CPU cores
+
+However:
+  - Local development: undefined (fast)
+  - CI environment: 1 (stable)
+  - Resource-constrained: 2-4
+
+
+Q4: What's the difference between 1 worker and 6 workers?
+
+A: 
+1 worker (Sequential):
+  - Tests run one after another
+  - Test1 (2s) → Test2 (2s) → Test3 (2s) = 6 seconds total
+  - Slow but predictable
+  - Easy to debug
+
+6 workers (Parallel):
+  - Tests run simultaneously
+  - Test1, Test2, Test3, ... run at same time
+  - 6 tests in 2 seconds (3x batches)
+  - Much faster but harder to debug
+
+
+Q5: When should I use workers: 1?
+
+A: Use 1 worker when:
+  ✓ Debugging test failures
+  ✓ Tests fail with multiple workers but pass with 1
+  ✓ System has limited resources
+  ✓ CI environment (for stability)
+  ✓ Tests depend on execution order (temporary fix)
+
+Don't use 1 worker for:
+  ✗ Regular test runs (too slow)
+  ✗ Large test suites (wastes time)
+
+
+================================================================================
+SECTION 2: INTERMEDIATE CONCEPTS
+================================================================================
+
+Q6: How are tests distributed across workers?
+
+A: Playwright uses FIFO (First-In-First-Out) queue distribution:
+
+1. All tests are loaded into a shared queue
+   Queue: [test1, test2, test3, ..., test17]
+
+2. First N tests go to N workers
+   Worker 1 ← test1
+   Worker 2 ← test2
+   Worker 3 ← test3
+
+3. As workers finish, they grab next test
+   Worker 1 finishes test1 → grabs test4
+   Worker 2 finishes test2 → grabs test5
+   Worker 3 finishes test3 → grabs test6
+
+4. Process continues until queue is empty
+
+This AUTOMATIC distribution ensures:
+  ✓ Even load balancing
+  ✓ No manual assignment needed
+  ✓ Dynamic based on test duration
+
+
+Q7: What happens if tests fail with multiple workers but pass with one?
+
+A: This indicates a TEST ISOLATION problem:
+
+Tests are interfering with each other. Root causes:
+  ├─ Shared database state modified by parallel tests
+  ├─ Global variables being modified
+  ├─ Cookie/session contamination across workers
+  ├─ Tests depend on execution order
+  └─ Race conditions hitting same API endpoint
+
+Solutions:
+  1. Add beforeEach/afterEach hooks to isolate each test
+  2. Create separate test data for each worker
+  3. Clean up database/state after each test
+  4. Use fixtures for proper setup/teardown
+  5. Avoid global state variables
+
+
+Q8: How do I configure workers for CI/CD pipelines?
+
+A: Use environment-based configuration:
+
+workers: process.env.CI ? 1 : undefined
+
+Why?
+  - Local (development): undefined → auto-detect (fast)
+  - CI (pipeline): 1 → sequential (stable)
+
+Reasoning for CI:
+  ✓ CI systems have unpredictable CPU availability
+  ✓ Shared resources cause flaky tests
+  ✓ Sequential execution = reliable results
+  ✓ Easier to troubleshoot in CI environment
+
+Usage:
+  npm test               ← Uses undefined (local)
+  CI=true npm test       ← Uses 1 (CI)
+
+
+Q9: What's the impact of increasing worker count?
+
+A: 
+POSITIVE:
+  ✓ Faster test execution
+  ✓ Better CPU utilization
+  ✓ Higher throughput
+
+NEGATIVE:
+  ✗ More memory usage (linear growth)
+  ✗ More network requests to server
+  ✗ Can overload target application
+  ✗ Context switching overhead
+
+Memory usage example:
+  - 1 worker × 450MB = 450MB
+  - 4 workers × 450MB = 1.8GB
+  - 8 workers × 450MB = 3.6GB
+
+Performance gain levels off after workers = CPU cores
+
+
+Q10: How do I debug issues with parallel tests?
+
+A: Use the --workers=1 flag to isolate problems:
+
+npx playwright test --workers=1
+
+If test:
+  ✓ PASSES with --workers=1
+  ✗ FAILS with --workers=6
+  → Problem is test isolation (see Q7)
+
+  ✓ PASSES with --workers=1
+  ✓ PASSES with --workers=6
+  → Everything is fine, run normally
+
+  ✗ FAILS with --workers=1
+  ✗ FAILS with --workers=6
+  → Problem is in the test itself (not workers)
+
+Also useful:
+  npx playwright test --debug --workers=1
+    ├─ Shows browser (headless: false)
+    ├─ Slows down execution (slowMo: 100ms)
+    ├─ Opens Inspector
+    └─ Sequential execution for clarity
+
+
+================================================================================
+SECTION 3: ADVANCED CONCEPTS
+================================================================================
+
+Q11: Explain the performance difference between 1, 4, and 8 workers for 100 tests,
+     each taking 2 seconds.
+
+A: 
+Formula: Total Time = (Total Tests / Workers) × Average Duration
+
+With 100 tests, 2s per test:
+
+1 worker:
+  Total time = (100 / 1) × 2s = 200s
+  Speed: baseline (1x)
+
+4 workers:
+  Total time = (100 / 4) × 2s = 50s
+  Speed: 4x faster (200s ÷ 50s = 4x)
+
+8 workers:
+  Total time = (100 / 8) × 2s = 25s
+  Speed: 8x faster (200s ÷ 25s = 8x)
+
+BUT: Diminishing returns apply
+  - Speedup = number of workers (only if CPU cores available)
+  - 8 workers on 4-core system = overhead cancels gains
+  - Optimal: workers ≈ CPU cores
+
+Memory usage:
+  1 worker: 450MB
+  4 workers: 1.8GB
+  8 workers: 3.6GB
+
+Recommendation: Use 4 workers (balance speed and resources)
+
+
+Q12: What's the difference between workers: undefined and workers: 4?
+
+A:
+workers: undefined (Auto-detect)
+  ✓ Detects CPU cores automatically
+  ✓ 6-core machine → 6 workers
+  ✓ 4-core machine → 4 workers
+  ✓ Adapts to different machines
+  ✓ No configuration needed
+  ✗ Varies between machines
+
+workers: 4 (Fixed)
+  ✓ Always exactly 4 workers
+  ✓ Consistent across machines
+  ✓ Predictable resource usage
+  ✗ Not optimal on 8+ core systems
+  ✗ Not optimal on 2-core systems
+
+Recommendation: Use undefined for local, 1 for CI
+
+
+Q13: How can you simulate a parallel test execution failure to test isolation?
+
+A: Create tests that share state:
+
+// ✗ BAD: Tests will fail in parallel
+let userId = 1;
+
+test('test 1', async ({page}) => {
+  userId = 100;
+  await page.goto(`/user/${userId}`);
+  // userId is modified globally
+});
+
+test('test 2', async ({page}) => {
+  userId = 200;  // Overwrites test 1's userId
+  await page.goto(`/user/${userId}`);
+});
+
+Run:
+  npx playwright test --workers=1    ← PASSES
+  npx playwright test --workers=2    ← FAILS (race condition)
+
+Fix:
+
+// ✓ GOOD: Each test has isolated data
+test('test 1', async ({page}) => {
+  const userId = 100;  // Local variable
+  await page.goto(`/user/${userId}`);
+});
+
+test('test 2', async ({page}) => {
+  const userId = 200;  // Separate variable
+  await page.goto(`/user/${userId}`);
+});
+
+Run:
+  npx playwright test --workers=2    ← PASSES
+
+
+Q14: Explain test queue consumption and how it ensures fair distribution.
+
+A: 
+Test Queue System:
+  
+Initial state:
+  Queue: [test1, test2, test3, test4, test5, test6, test7, test8]
+  Workers: [W1, W2, W3, W4]
+
+Distribution (assuming each test = 2s):
+  t=0s:  All 4 workers take first test
+         W1←test1, W2←test2, W3←test3, W4←test4
+         (4 tests running in parallel)
+
+  t=2s:  All 4 tests finish, workers grab next
+         W1←test5, W2←test6, W3←test7, W4←test8
+         (remaining 4 tests run)
+
+  t=4s:  All tests complete
+         Total: 4 seconds
+
+Fair distribution mechanism:
+  ✓ FIFO queue: Tests processed in order
+  ✓ Idle workers grab next: No worker sits idle
+  ✓ Dynamic assignment: Faster tests don't bottleneck
+  ✓ Load balancing: Automatic based on completion time
+
+Example with variable durations:
+  Queue: [1s, 5s, 2s, 3s, 1s, 4s]
+  
+  W1: 1s → finishes first, grabs 3s → finishes, grabs nothing
+  W2: 5s → runs long
+  Total: ~5s (limited by slowest test, not limited by distribution)
+
+Benefit: Natural load balancing without configuration
+
+
+Q15: What is the relationship between test.beforeEach() and parallelization?
+
+A: 
+test.beforeEach() runs BEFORE EACH TEST in isolation
+
+Key point: Each test gets its own beforeEach execution
+
+Example:
+
+test.beforeEach(async ({page}) => {
+  console.log(`Setting up test on Worker ${test.info().workerIndex}`);
+  await createTestUser();
+});
+
+test('test 1', async ({page}) => {
+  console.log(`Running test 1 on Worker ${test.info().workerIndex}`);
+});
+
+test('test 2', async ({page}) => {
+  console.log(`Running test 2 on Worker ${test.info().workerIndex}`);
+});
+
+Output with 2 workers:
+  Setting up test on Worker 0
+  Running test 1 on Worker 0
+  Setting up test on Worker 1
+  Running test 2 on Worker 1
+
+Critical for parallelization:
+  ✓ Automatically runs per worker
+  ✓ Each test has isolated setup
+  ✓ Perfect for creating test data
+  ✓ Prevents shared state issues
+
+Why it's crucial:
+  Without beforeEach isolation, parallel tests would share state
+  With beforeEach, each test is independent
+
+
+================================================================================
+SECTION 4: TROUBLESHOOTING & REAL-WORLD SCENARIOS
+================================================================================
+
+Q16: A test passes with --workers=1 but times out with --workers=4. Why?
+
+A: 
+Two possible reasons:
+
+REASON 1: Application can't handle parallel load
+  - 4 browsers × N tests = many simultaneous requests
+  - Server rate limiting or connection limits
+  - Network bandwidth exhausted
+  - Target application slowing down under load
+
+Solutions:
+  1. Reduce workers: npx playwright test --workers=2
+  2. Increase timeout: timeout: 60000 (in config)
+  3. Add delays between tests: await page.waitForTimeout(500)
+  4. Check server logs for errors/limits
+
+REASON 2: Test isolation issue
+  - Tests compete for same resources
+  - Database connections exhausted
+  - Shared API rate limit
+  - Cookie/session conflicts
+
+Solutions:
+  1. Verify test isolation: Each test should be independent
+  2. Use beforeEach/afterEach hooks
+  3. Create separate test data per worker
+  4. Check if tests share database/session state
+
+Diagnostic approach:
+  1. Check server logs while running with 4 workers
+  2. Look for "connection refused", "rate limit", "timeout"
+  3. Reduce workers gradually until stable
+  4. Once stable at X workers, diagnose root cause
+
+
+Q17: How do you structure a test that works correctly with multiple workers?
+
+A: 
+Three-part structure:
+
+test('should create and verify user', async ({page}) => {
+  // PART 1: SETUP (create isolated test data)
+  const testUser = {
+    email: `test-${Date.now()}@example.com`,  // Unique per test
+    password: 'TestPassword123'
+  };
+  
+  // PART 2: EXECUTE (test logic)
+  await page.goto('/register');
+  await page.fill('[email]', testUser.email);
+  await page.fill('[password]', testUser.password);
+  await page.click('[submit]');
+  
+  // PART 3: VERIFY & CLEANUP
+  await expect(page.locator('.success')).toBeVisible();
+  
+  // CLEANUP (remove test data for next run)
+  await deleteUser(testUser.email);
+});
+
+Key principles:
+  ✓ Unique test data: Use timestamp, random ID, or worker index
+  ✓ No shared state: Don't rely on global variables
+  ✓ Complete cleanup: Teardown after test
+  ✓ Independent: Test passes regardless of other tests
+  ✓ Idempotent: Can run multiple times safely
+
+Using fixtures (better):
+
+import { test as base } from '@playwright/test';
+
+const test = base.extend({
+  testUser: async ({}, use) => {
+    const user = {
+      email: `test-${Date.now()}@example.com`,
+      password: 'TestPassword123'
+    };
+    await use(user);
+    await deleteUser(user.email);  // Auto cleanup
+  },
+});
+
+test('should create user', async ({testUser}) => {
+  // User is created and cleaned up automatically
+  expect(testUser.email).toBeDefined();
+});
+
+
+Q18: What does "Worker N has crashed" mean and how do you fix it?
+
+A: 
+This error means a worker process terminated unexpectedly.
+
+Root causes:
+
+1. OUT OF MEMORY
+   - Too many workers for available RAM
+   - Large test data not being cleaned up
+   - Browser instances consuming memory
+   
+   Fix:
+   - Reduce workers: npx playwright test --workers=2
+   - Check memory usage while tests run
+   - Verify cleanup code runs
+
+2. PORT CONFLICT
+   - Multiple browsers trying to use same port
+   - Usually indicates worker spawn issue
+   
+   Fix:
+   - Restart VS Code
+   - Kill any hanging node processes
+   - Reduce worker count
+
+3. BROWSER CRASH
+   - Uncaught exception in test
+   - Invalid test logic
+   - Browser stability issue
+   
+   Fix:
+   - Run with --workers=1 to identify failing test
+   - Check browser console errors
+   - Add error handling
+
+4. SYSTEM RESOURCE LIMIT
+   - Too many processes spawned
+   - File descriptor limit reached
+   - Process limit reached
+   
+   Fix:
+   - Reduce workers
+   - Monitor system resources
+   - Close other applications
+
+Debugging steps:
+
+npx playwright test --workers=1   # If passes = resource issue
+npx playwright test --workers=2   # Gradually increase
+DEBUG=pw:api npx playwright test  # See detailed logs
+# Check Task Manager for memory/CPU usage
+
+
+Q19: Compare sequential (1 worker) vs parallel (6 workers) test execution.
+
+A: 
+SEQUENTIAL (1 Worker):
+
+Execution:
+  Test1 (2s) → Test2 (2s) → Test3 (2s) = 6 seconds total
+
+Advantages:
+  ✓ Easy to understand (linear flow)
+  ✓ Easy to debug (clear order)
+  ✓ Low memory usage (~450MB)
+  ✓ Stable in CI environments
+  ✓ Can have test order dependencies
+
+Disadvantages:
+  ✗ Very slow (no parallelism)
+  ✗ Wastes CPU capacity
+  ✗ Poor feedback loop for developers
+
+Best for:
+  - CI/CD pipelines (stability)
+  - Debugging test failures
+  - Resource-constrained systems
+
+
+PARALLEL (6 Workers):
+
+Execution:
+  Test1, Test2, Test3, Test4, Test5, Test6 (all run simultaneously)
+  Batches: 6 tests per 2s = 6 tests total in 2s
+
+Advantages:
+  ✓ Much faster (3-6x speedup)
+  ✓ Better developer feedback
+  ✓ Efficient CPU utilization
+  ✓ Ideal for large test suites
+
+Disadvantages:
+  ✗ More complex to debug
+  ✗ Higher memory usage (~2.7GB for 6 workers)
+  ✗ Tests must be isolated
+  ✗ Can overload target application
+
+Best for:
+  - Local development (fast feedback)
+  - Large test suites
+  - Dedicated machines with resources
+
+
+Comparison table:
+
+Feature          │ Sequential │ Parallel
+─────────────────┼────────────┼──────────────
+Speed            │ Slow       │ Fast (3-6x)
+Memory           │ Low        │ High
+Complexity       │ Simple     │ Complex
+Test isolation   │ Not needed │ Critical
+Debugging        │ Easy       │ Hard
+CI environment   │ Ideal      │ Risky
+Local dev        │ Acceptable │ Ideal
+
+
+Q20: How would you handle a situation where tests pass locally with 6 workers
+     but fail on CI with 1 worker?
+
+A: 
+This is OPPOSITE of typical issues (usually passes with 1, fails with 6).
+
+Root causes:
+  ├─ Environment differences (local vs CI)
+  ├─ Different OS (Windows local, Linux CI)
+  ├─ Different dependencies installed
+  ├─ Network differences (local has local server, CI uses remote)
+  ├─ Timing assumptions (local is faster)
+  ├─ Hard-coded paths or URLs
+  └─ Timezone or date-dependent logic
+
+Diagnostic approach:
+
+Step 1: Run locally with same config as CI
+  npm test --workers=1  # Simulate CI behavior
+  
+  If FAILS: Problem is test code, not parallelization
+  If PASSES: Problem is environment difference
+
+Step 2: Check CI logs
+  Look for:
+  - Network timeouts
+  - File system issues
+  - Missing dependencies
+  - Different browser versions
+  - Environment variable differences
+
+Step 3: Common fixes
+  
+  Hard-coded URLs:
+  ✗ await page.goto('http://localhost:3000')
+  ✓ await page.goto(process.env.TEST_URL)
+  
+  Hard-coded paths:
+  ✗ await page.goto('./page')
+  ✓ await page.goto(path.join(__dirname, 'page'))
+  
+  Timing assumptions:
+  ✗ await page.waitForTimeout(1000)
+  ✓ await expect(locator).toBeVisible()
+  
+  Missing setup:
+  ✗ Assume database is populated
+  ✓ Create test data explicitly
+  
+  Timezone-dependent:
+  ✗ await expect(text).toContain('Today')
+  ✓ await expect(text).toContain(getToday())
+
+Step 4: Update CI configuration
+  
+  If it's expected to run sequential in CI:
+  workers: process.env.CI ? 1 : undefined
+  
+  If network is slow:
+  timeout: 60000  # Increase timeout on CI
+
+
+================================================================================
+SECTION 5: CONFIGURATION & OPTIMIZATION
+================================================================================
+
+Q21: What's the best practice for worker configuration?
+
+A: 
+RECOMMENDED APPROACH:
+
+export default defineConfig({
+  // Auto-detect locally, sequential in CI
+  workers: process.env.CI ? 1 : undefined,
+  
+  // Maximize parallelism
+  fullyParallel: true,
+  
+  // Reasonable timeouts
+  timeout: 30000,
+  expect: {timeout: 5000},
+  
+  // Proper retry strategy
+  retries: process.env.CI ? 2 : 0,
+});
+
+Why this works:
+  ✓ Local: Fast feedback with auto-detected workers
+  ✓ CI: Stable with sequential execution
+  ✓ Parallelism: Maximized locally
+  ✓ Timeouts: Allow for network variance
+  ✓ Retries: Handle flaky tests in CI
+
+
+ALTERNATIVE FOR DEBUG:
+
+const isDebug = !!process.env.DEBUG;
+
+export default defineConfig({
+  workers: isDebug ? 1 : undefined,
+  fullyParallel: !isDebug,
+  timeout: isDebug ? 0 : 30000,
+  use: {
+    headless: !isDebug,
+    slowMo: isDebug ? 100 : 0,
+  },
+});
+
+Usage:
+  npm test              ← Normal run
+  DEBUG=true npm test   ← Debug mode
+
+
+Q22: How do you decide on a worker count strategy for your team?
+
+A:
+Step-by-step approach:
+
+STEP 1: Baseline measurement
+  - Run suite with workers: undefined (auto-detect)
+  - Record execution time
+  - Monitor memory usage
+  - Check for errors
+
+STEP 2: Test with different counts
+  npx playwright test --workers=2
+  npx playwright test --workers=4
+  npx playwright test --workers=6
+  npx playwright test --workers=8
+  
+  Record:
+  - Execution time
+  - Memory usage
+  - Pass/fail rate
+  - Error types
+
+STEP 3: Find optimal point
+  - Fastest execution time
+  - Stable tests (no flakes)
+  - Memory usage < 80% of available RAM
+  - No application overload
+
+STEP 4: Document for team
+
+  // playwright.config.ts
+  export default defineConfig({
+    // Recommended: auto-detect, capped at 6 for stability
+    workers: Math.min(require('os').cpus().length, 6),
+    
+    // For CI:
+    // workers: process.env.CI ? 1 : undefined,
+  });
+  
+  // Document in README:
+  // - Local: 6 workers (auto-detected, capped)
+  // - CI: 1 worker (sequential for stability)
+  // - Rationale: Stable on shared CI systems
+
+
+Q23: What metrics should you monitor when using multiple workers?
+
+A:
+KEY METRICS:
+
+1. Execution Time
+   Measure: Total time to complete full suite
+   Metric: seconds
+   Track: Compare sequential vs parallel
+   
+   Example:
+   - 1 worker: 120s
+   - 6 workers: 25s (4.8x speedup)
+
+2. Memory Usage
+   Measure: Peak RAM consumption
+   Metric: GB
+   Track: Should not exceed 80% of available RAM
+   
+   Example:
+   - 1 worker: 450MB
+   - 6 workers: 2.7GB (acceptable if system has 4GB+)
+
+3. CPU Utilization
+   Measure: Average CPU usage during tests
+   Metric: Percentage
+   Track: Should scale with worker count
+   
+   Example:
+   - 1 worker: ~20%
+   - 6 workers: ~80-100%
+
+4. Pass Rate
+   Measure: Percentage of tests passing
+   Metric: % or count
+   Track: Should be 100% consistently
+   
+   Watch for:
+   - Flaky tests (intermittent failures)
+   - Tests that fail only with certain worker counts
+
+5. Error Types
+   Measure: Different error categories
+   Metric: count
+   Track: Timeout, connection, flaky errors
+   
+   If higher with parallel:
+   - May indicate load issue (need fewer workers)
+   - May indicate test isolation issue
+
+
+Monitoring tools:
+
+npx playwright test --reporter=list
+  └─ Shows timing per test and worker
+
+npx playwright show-report
+  └─ HTML report with timeline visualization
+
+Task Manager / Activity Monitor
+  └─ Monitor memory and CPU while running
+
+Performance assertion:
+
+test('performance', async () => {
+  const startTime = Date.now();
+  // ... run tests
+  const duration = Date.now() - startTime;
+  
+  // Verify reasonable duration
+  expect(duration).toBeLessThan(30000);
+});
+
+
+================================================================================
+SECTION 6: ENTERPRISE & SCALE
+================================================================================
+
+Q24: How do you handle database state management with parallel tests?
+
+A: 
+Challenge: Multiple workers modifying database simultaneously
+
+Solution approaches:
+
+APPROACH 1: Isolated Test Data Per Worker
+
+test.describe('User management', () => {
+  const workerId = test.info().workerIndex;
+  const testUserId = `user-w${workerId}-${Date.now()}`;
+  
+  test('should create user', async ({page}) => {
+    await createUser({id: testUserId, name: 'Test User'});
+    await expect(page.locator('[user-id]')).toContainText(testUserId);
+  });
+  
+  test.afterAll(async () => {
+    await deleteUser(testUserId);
+  });
+});
+
+Benefits:
+  ✓ Each worker has own test data
+  ✓ No conflicts between workers
+  ✓ Easy cleanup
+  ✓ Truly parallel
+
+
+APPROACH 2: Shared Test Database with Cleanup
+
+test.beforeEach(async ({page}) => {
+  // Always clean slate before test
+  await cleanDatabase();
+  await seedTestData();
+});
+
+test.afterEach(async ({page}) => {
+  // Clean after each test
+  await cleanDatabase();
+});
+
+Benefits:
+  ✓ Database in known state
+  ✓ Works with any number of workers
+  ✓ Prevents data accumulation
+
+
+APPROACH 3: Database Transactions
+
+test('should create user', async ({page}) => {
+  await database.beginTransaction();
+  
+  try {
+    const user = await createUser({...});
+    // Test logic
+    await page.goto(`/users/${user.id}`);
+  } finally {
+    await database.rollback();  // Always rollback
+  }
+});
+
+Benefits:
+  ✓ No leftover test data
+  ✓ Fast cleanup
+  ✓ Works with any scale
+  ✓ No manual deletion needed
+
+
+APPROACH 4: Fixtures (Recommended)
+
+import { test as base } from '@playwright/test';
+
+const test = base.extend({
+  testUser: async ({}, use) => {
+    const workerId = test.info().workerIndex;
+    
+    // Setup
+    const user = await createUser({
+      id: `test-${workerId}-${Date.now()}`,
+      name: 'Test User'
+    });
+    
+    // Use in test
+    await use(user);
+    
+    // Cleanup (automatic)
+    await deleteUser(user.id);
+  },
+});
+
+test('should display user', async ({testUser}) => {
+  // testUser is automatically created and cleaned up
+  expect(testUser.id).toBeDefined();
+});
+
+Benefits:
+  ✓ Automatic setup/cleanup
+  ✓ Scoped to test
+  ✓ Works with multiple workers
+  ✓ Clean syntax
+  ✓ Reusable across tests
+
+
+BEST PRACTICE:
+
+Use fixtures + isolated test data:
+
+test.extend({
+  uniqueEmail: async ({}, use) => {
+    const workerId = test.info().workerIndex;
+    const email = `test-w${workerId}-${Date.now()}@example.com`;
+    await use(email);
+    // Cleanup not needed (email is unique)
+  },
+});
+
+test('should create account', async ({uniqueEmail}) => {
+  await signup({email: uniqueEmail});
+  // No cleanup needed - unique email per test
+});
+
+
+Q25: What are the limits of parallelization? When should you NOT use parallel tests?
+
+A:
+SCENARIOS WHERE PARALLEL IS NOT IDEAL:
+
+1. Integration Tests with Shared Dependencies
+   Example: All tests create database records
+   Problem: Race conditions at database level
+   
+   Solution:
+   - Use transaction rollback
+   - Isolate data per worker
+   - Or: Run sequentially
+
+2. Load/Performance Tests
+   Example: Measuring server response time
+   Problem: 6 workers = 6x load, skews results
+   
+   Solution:
+   - Run these separately with --workers=1
+   - Mark with special tag
+   
+   test('should respond in < 1s', async ({page}, testInfo) => {
+     testInfo.skip(process.env.PARALLEL, 'Skip in parallel');
+     // ...
+   });
+
+3. Tests with External API Calls
+   Example: Real API, rate-limited
+   Problem: Multiple workers exceed rate limit
+   
+   Solution:
+   - Mock external APIs
+   - Or: Increase delays between calls
+   - Or: Run with fewer workers
+
+4. Order-Dependent Tests
+   Example: test2 depends on test1's data
+   Problem: Different execution order
+   
+   Solution:
+   - Refactor to independent tests
+   - Or: Run with --workers=1
+   
+   Generally BAD practice anyway - avoid this
+
+5. Flaky Tests
+   Example: Tests with timing issues
+   Problem: Harder to debug with parallelization
+   
+   Solution:
+   - Fix flaky tests first
+   - Then enable parallelization
+   
+   npx playwright test --workers=1 to debug
+
+
+WHEN TO USE SEQUENTIAL (--workers=1):
+
+✓ Load/stress tests (measure actual performance)
+✓ Security/penetration tests (controlled requests)
+✓ Database migration tests (schema changes)
+✓ Debugging (clear execution order)
+✓ CI pipeline (stability over speed)
+✓ First-time test runs (verify correctness before speed)
+
+
+RECOMMENDATION:
+
+// playwright.config.ts
+export default defineConfig({
+  use: {
+    // Run load tests sequentially
+    workers: process.env.LOAD_TEST ? 1 : undefined,
+  },
+});
+
+Usage:
+  npm test                    ← Normal (parallel)
+  LOAD_TEST=true npm test     ← Load test (sequential)
+
+
+================================================================================
+END OF INTERVIEW QUESTIONS
+================================================================================
+
+Document version: 1.0
+Last updated: December 2025
+Difficulty: Beginner to Advanced
+Total questions: 25
+
+For follow-up on any topic, refer to:
+- Complete Guide: 07_Workers_And_Parallelization_Complete_Guide.txt
+- Practical Examples: 09_Workers_And_Parallelization_Practical_Examples.txt

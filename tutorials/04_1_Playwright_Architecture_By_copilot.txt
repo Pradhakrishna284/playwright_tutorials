@@ -1,0 +1,125 @@
+Sample (reference)
+TypeScriptimport { test, expect } from '@playwright/test';test('login flow', async ({ page }) => {  await page.goto('https://app.example.com');  await page.getByLabel('Email').fill('user@example.com');  await page.getByRole('button', { name: 'Sign in' }).click();  await expect(page).toHaveURL(/dashboard/);});``Show more lines
+
+How this code exercises the architecture
+1) Test Runner → Worker → Fixtures
+
+import { test, expect } from '@playwright/test'
+
+Uses Playwright Test runner, which manages projects (browsers/devices), parallel workers, retries, reporting.
+The runner spins up workers (processes) to execute tests in parallel.
+Each worker gets fixtures. In this test, { page } is a built-in fixture giving you a ready-to-use Page.
+
+
+
+
+Architecture mapping:
+Runner (CLI / test orchestrator) → Worker (per-parallel unit) → Fixtures (provide browser, context, page and utilities).
+
+
+2) Playwright Core API (Cross-browser abstraction)
+
+All calls like page.goto, getByLabel, getByRole, click, and expect use the Playwright Core API:
+
+Translates high-level commands into protocol messages for the chosen browser engine (Chromium / Firefox / WebKit).
+Implements auto-waiting and locator semantics to stabilize tests (waits for element readiness, navigation, network idleness).
+
+
+
+
+Architecture mapping:
+Your test code → Playwright Core (API & orchestration) → Browser protocol (WebSocket/pipe).
+
+
+3) Browser Process & Connection
+
+When the first test in a worker starts, Playwright:
+
+launches a browser process (per project / worker, depending on config),
+connects to it over a WebSocket or pipe.
+
+
+
+
+Architecture mapping:
+Core spawns Browser process and maintains a live connection for commands & events.
+
+
+4) Browser Context (isolated session)
+
+The { page } fixture is created inside a Browser Context, which is:
+
+An isolated environment with its own cookies, local storage, cache, permissions, locale, etc.
+Cheap to create, enabling parallelism and test isolation without spawning new browsers for each test.
+
+
+
+
+Architecture mapping:
+Per test (or per worker/project), Core creates a Context → then a Page (tab) inside it.
+
+
+5) Page (tab) and Locators
+
+
+page.goto('https://app.example.com')
+
+Instructs the browser to navigate; Playwright auto-waits for load states.
+
+
+
+page.getByLabel('Email')
+
+A Locator created via semantic selector (ARIA label).
+Locators are lazy: they resolve the element at action time and retry with auto-waits until the element is ready (attached, visible, stable).
+
+
+
+.fill('user@example.com')
+
+Sends input events; Playwright ensures the element is editable & focused.
+
+
+
+page.getByRole('button', { name: 'Sign in' }).click()
+
+Another Locator with an ARIA role + accessible name.
+Click waits for stable target, then dispatches mouse events and waits for any navigation triggered by the click (unless told otherwise).
+
+
+
+
+Architecture mapping:
+Page (tab) owns Locators → actions go through Core → to Browser → DOM events → auto-wait + event handling.
+
+
+6) Assertions & Expect
+
+await expect(page).toHaveURL(/dashboard/)
+
+The assertion layer polls the browser state until it matches (or times out).
+Integrates with auto-wait (e.g., waits for navigations/loads triggered by actions).
+
+
+
+
+Architecture mapping:
+Assertion engine interacts with Core → checks Page state continuously → reports via runner.
+
+
+End-to-end Sequence (what happens under the hood)
+
+Playwright Test (runner) starts
+  ├─ Creates N workers for parallel execution
+  ├─ For each worker/project:
+  │    ├─ Launch browser process (Chromium/Firefox/WebKit)
+  │    ├─ Create isolated browser context
+  │    ├─ Create page (tab) fixture and hand it to the test
+  │    └─ Run test steps:
+  │         1) page.goto(...) → navigation + auto-wait
+  │         2) getByLabel(...) → locator resolves lazily
+  │         3) fill(...) → input event + stability checks
+  │         4) getByRole(...).click() → click + potential navigation
+  │         5) expect(page).toHaveURL(...) → assertion polling
+  └─ Collect artifacts (trace/screenshot/video if enabled) and report
+``

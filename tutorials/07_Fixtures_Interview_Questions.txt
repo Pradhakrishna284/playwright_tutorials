@@ -1,0 +1,1653 @@
+================================================================================
+              PLAYWRIGHT FIXTURES - INTERVIEW QUESTIONS
+                  Comprehensive Q&A for All Skill Levels
+================================================================================
+
+TABLE OF CONTENTS
+=================
+
+BEGINNER LEVEL (Questions 1-20)
+  - Basic fixture concepts
+  - Built-in fixtures
+  - Simple usage patterns
+
+INTERMEDIATE LEVEL (Questions 21-40)
+  - Custom fixtures
+  - Fixture scopes
+  - Page Object patterns with fixtures
+
+ADVANCED LEVEL (Questions 41-60)
+  - Complex fixture composition
+  - Performance optimization
+  - Advanced patterns and architecture
+
+SCENARIO-BASED QUESTIONS (Questions 61-75)
+  - Real-world problem solving
+  - Design decisions
+  - Troubleshooting
+
+================================================================================
+
+BEGINNER LEVEL QUESTIONS (1-20)
+================================
+
+Q1: What are fixtures in Playwright?
+-------------------------------------
+
+ANSWER:
+Fixtures are pre-configured test dependencies that Playwright automatically
+provides to your tests through dependency injection.
+
+Key Points:
+- Automatically set up before test
+- Automatically cleaned up after test
+- Injected as parameters to test functions
+- Reusable across multiple tests
+
+Example:
+
+test('example', async ({ page }) => {
+  // 'page' is a fixture
+  // Playwright created it before this test
+  // Will clean it up after
+  await page.goto('https://example.com');
+});
+
+Behind the scenes:
+1. Creates browser context
+2. Creates page
+3. Injects page into test
+4. Runs test
+5. Closes page and context
+
+================================================================================
+
+Q2: What does the { page } syntax mean in test functions?
+----------------------------------------------------------
+
+ANSWER:
+It's JavaScript destructuring that extracts the 'page' fixture from the
+fixtures object that Playwright provides.
+
+Detailed Explanation:
+
+// This:
+test('my test', async ({ page }) => {
+  await page.goto('/');
+});
+
+// Is equivalent to:
+test('my test', async (fixtures) => {
+  const page = fixtures.page;
+  await page.goto('/');
+});
+
+// You can request multiple fixtures:
+test('my test', async ({ page, context, request }) => {
+  // All three fixtures available
+});
+
+================================================================================
+
+Q3: Name the 5 most common built-in fixtures in Playwright.
+------------------------------------------------------------
+
+ANSWER:
+
+1. page: Page
+   - Fresh page for each test
+   - Most commonly used
+   - Isolated browser context
+
+2. context: BrowserContext
+   - For multiple pages
+   - Shared state (cookies, storage)
+   - Custom context settings
+
+3. browser: Browser
+   - Low-level browser access
+   - Create custom contexts
+   - Advanced scenarios
+
+4. request: APIRequestContext
+   - API testing without browser
+   - HTTP requests
+   - Faster than browser for API calls
+
+5. browserName: string
+   - Current browser name
+   - 'chromium', 'firefox', or 'webkit'
+   - For conditional test logic
+
+================================================================================
+
+Q4: When would you use { context } instead of { page }?
+--------------------------------------------------------
+
+ANSWER:
+Use { context } when you need:
+
+1. Multiple Pages in Same Test:
+
+test('multiple pages', async ({ context }) => {
+  const page1 = await context.newPage();
+  const page2 = await context.newPage();
+  
+  // Both pages share cookies and storage
+  await page1.goto('/login');
+  await page2.goto('/dashboard');
+});
+
+2. Shared State Between Pages:
+
+test('shared cookies', async ({ context }) => {
+  const page1 = await context.newPage();
+  await page1.goto('/set-cookie');
+  
+  const page2 = await context.newPage();
+  await page2.goto('/use-cookie');
+  // page2 has access to cookies from page1
+});
+
+3. Custom Context Configuration:
+
+test('custom settings', async ({ context }) => {
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+});
+
+Use { page } for simple single-page tests (90% of cases).
+
+================================================================================
+
+Q5: What is the { request } fixture used for?
+----------------------------------------------
+
+ANSWER:
+The { request } fixture is for making HTTP API calls without launching a browser.
+
+Benefits:
+✓ Faster than browser (no rendering)
+✓ API testing
+✓ Test data setup
+✓ Verification of backend
+
+Example - API Testing:
+
+test('fetch users', async ({ request }) => {
+  const response = await request.get('https://api.example.com/users');
+  
+  expect(response.status()).toBe(200);
+  const data = await response.json();
+  expect(data.users).toHaveLength(10);
+});
+
+Example - Test Data Setup:
+
+test('create user via API', async ({ request, page }) => {
+  // Fast: Create via API
+  const response = await request.post('/api/users', {
+    data: { name: 'Test User', email: 'test@example.com' }
+  });
+  const user = await response.json();
+  
+  // Slow: Verify in UI
+  await page.goto(`/users/${user.id}`);
+  await expect(page.locator('.username')).toHaveText('Test User');
+});
+
+Common Use Cases:
+- POST: Create test data
+- GET: Verify API responses
+- PUT/PATCH: Update resources
+- DELETE: Cleanup test data
+
+================================================================================
+
+Q6: How do fixtures handle cleanup?
+------------------------------------
+
+ANSWER:
+Fixtures automatically handle cleanup after test completion (success or failure).
+
+Built-in Fixtures (Automatic Cleanup):
+- page: Automatically closed after test
+- context: Automatically closed after test
+- browser: Managed by test runner
+
+Custom Fixtures (Manual Cleanup):
+
+export const test = base.extend({
+  myFixture: async ({}, use) => {
+    // SETUP
+    const resource = await acquireResource();
+    
+    // PROVIDE TO TEST
+    await use(resource);
+    
+    // CLEANUP (runs even if test fails)
+    await releaseResource(resource);
+  },
+});
+
+Cleanup Guarantees:
+✓ Runs even if test fails
+✓ Runs even if assertions fail
+✓ Runs in LIFO order (last created, first cleaned)
+
+Example:
+
+test('cleanup example', async ({ page }) => {
+  await page.goto('/');
+  throw new Error('Test failed!');
+  // page is STILL cleaned up automatically
+});
+
+================================================================================
+
+Q7: Can you request multiple fixtures in one test?
+---------------------------------------------------
+
+ANSWER:
+Yes! You can request as many fixtures as needed.
+
+Example:
+
+test('multiple fixtures', async ({ page, context, request, browser, browserName }) => {
+  console.log(`Testing on ${browserName}`);
+  
+  // Use API to create data
+  await request.post('/api/users', { data: { name: 'Test' } });
+  
+  // Use page for UI
+  await page.goto('/users');
+  
+  // Use context for additional page
+  const page2 = await context.newPage();
+  await page2.goto('/other');
+  
+  // Use browser for custom context
+  const customContext = await browser.newContext({ locale: 'fr-FR' });
+  const page3 = await customContext.newPage();
+});
+
+Best Practice:
+Only request fixtures you actually use. Don't request everything "just in case."
+
+================================================================================
+
+Q8: What is the difference between fixtures and beforeEach/afterEach?
+----------------------------------------------------------------------
+
+ANSWER:
+
+beforeEach/afterEach Approach:
+
+let page;
+
+test.beforeEach(async ({ browser }) => {
+  page = await browser.newContext().newPage();
+});
+
+test.afterEach(async () => {
+  await page.close();
+});
+
+test('test 1', async () => {
+  await page.goto('/');
+});
+
+Fixtures Approach:
+
+const test = base.extend({
+  myPage: async ({ page }, use) => {
+    await page.goto('/');
+    await use(page);
+  },
+});
+
+test('test 1', async ({ myPage }) => {
+  // Already on homepage
+});
+
+Fixtures Advantages:
+✓ Type-safe
+✓ Composable (fixtures can depend on other fixtures)
+✓ Scoped (test or worker)
+✓ Reusable across files
+✓ Automatic cleanup guaranteed
+✓ Better for dependency injection
+
+beforeEach/afterEach is fine for simple cases, but fixtures scale better.
+
+================================================================================
+
+Q9: How do you create a simple custom fixture?
+-----------------------------------------------
+
+ANSWER:
+
+Step 1: Define the fixture type
+Step 2: Extend base test
+Step 3: Export the extended test
+
+Example:
+
+import { test as base, expect } from '@playwright/test';
+
+// Step 1: Define type
+type MyFixtures = {
+  todoPage: Page;
+};
+
+// Step 2: Extend base
+export const test = base.extend<MyFixtures>({
+  todoPage: async ({ page }, use) => {
+    // Setup
+    await page.goto('https://demo.playwright.dev/todomvc');
+    
+    // Provide to test
+    await use(page);
+    
+    // Teardown (optional)
+    console.log('Cleanup');
+  },
+});
+
+// Step 3: Export expect too
+export { expect };
+
+Usage:
+
+import { test, expect } from './my-fixtures';
+
+test('add todo', async ({ todoPage }) => {
+  await todoPage.fill('.new-todo', 'Buy milk');
+  await todoPage.press('.new-todo', 'Enter');
+  await expect(todoPage.locator('.todo-list li')).toHaveText('Buy milk');
+});
+
+================================================================================
+
+Q10: What is the 'use' function in custom fixtures?
+----------------------------------------------------
+
+ANSWER:
+The 'use' function is how you provide the fixture value to the test.
+
+Structure:
+
+async ({ dependencies }, use) => {
+  // 1. SETUP: Runs before test
+  const resource = await createResource();
+  
+  // 2. USE: Provide to test and wait for test to complete
+  await use(resource);
+  
+  // 3. TEARDOWN: Runs after test
+  await cleanupResource(resource);
+}
+
+Important:
+- Must call await use() exactly once
+- Code before use() is setup
+- Code after use() is teardown
+- Test runs between use() call and return
+
+Example:
+
+export const test = base.extend({
+  timer: async ({}, use) => {
+    const start = Date.now();
+    console.log('Setup: Timer started');
+    
+    await use(start);  // Test runs here
+    
+    const end = Date.now();
+    console.log(`Teardown: Test took ${end - start}ms`);
+  },
+});
+
+Output:
+Setup: Timer started
+[test runs]
+Teardown: Test took 1234ms
+
+================================================================================
+
+Q11: What happens if you don't call 'await use()' in a fixture?
+----------------------------------------------------------------
+
+ANSWER:
+The test will never receive the fixture value and will fail.
+
+Error Example:
+
+export const test = base.extend({
+  myFixture: async ({}, use) => {
+    const value = 'test';
+    // Forgot: await use(value);
+  },
+});
+
+test('will fail', async ({ myFixture }) => {
+  console.log(myFixture); // undefined
+});
+
+Error Message:
+TypeError: Cannot read properties of undefined
+
+Correct:
+
+export const test = base.extend({
+  myFixture: async ({}, use) => {
+    const value = 'test';
+    await use(value); // ✅ Must call this
+  },
+});
+
+Rule: ALWAYS call await use() exactly once in every fixture.
+
+================================================================================
+
+Q12: Can fixtures depend on other fixtures?
+--------------------------------------------
+
+ANSWER:
+Yes! Fixtures can request other fixtures as dependencies.
+
+Example:
+
+type MyFixtures = {
+  apiToken: string;
+  authenticatedRequest: APIRequestContext;
+};
+
+export const test = base.extend<MyFixtures>({
+  // First fixture: Get token
+  apiToken: async ({ request }, use) => {
+    const response = await request.post('/api/auth', {
+      data: { username: 'test', password: 'test123' }
+    });
+    const { token } = await response.json();
+    await use(token);
+  },
+  
+  // Second fixture: Uses apiToken
+  authenticatedRequest: async ({ request, apiToken }, use) => {
+    // Depends on apiToken fixture
+    const authRequest = {
+      get: (url) => request.get(url, {
+        headers: { 'Authorization': `Bearer ${apiToken}` }
+      }),
+    };
+    await use(authRequest);
+  },
+});
+
+Usage:
+
+test('use authenticated request', async ({ authenticatedRequest }) => {
+  // authenticatedRequest automatically has token from apiToken fixture
+  const response = await authenticatedRequest.get('/api/profile');
+  expect(response.ok()).toBeTruthy();
+});
+
+Dependency Chain:
+test → authenticatedRequest → apiToken → request
+
+================================================================================
+
+Q13: What is fixture scope?
+----------------------------
+
+ANSWER:
+Fixture scope determines how often the fixture is created and destroyed.
+
+Two Scopes:
+
+1. test (default):
+   - New instance for EACH test
+   - Maximum isolation
+   - Slower but safer
+
+2. worker:
+   - Shared across ALL tests in worker
+   - Created ONCE per worker
+   - Faster but less isolated
+
+Syntax:
+
+// Test-scoped (default)
+export const test = base.extend({
+  myFixture: async ({}, use) => {
+    await use('value');
+  },
+});
+
+// Worker-scoped (explicit)
+export const test = base.extend({
+  myFixture: [async ({}, use) => {
+    await use('value');
+  }, { scope: 'worker' }],
+});
+
+Execution:
+
+Test-scoped (3 tests):
+  Test 1: setup → test → teardown
+  Test 2: setup → test → teardown
+  Test 3: setup → test → teardown
+
+Worker-scoped (3 tests in same worker):
+  Worker Start: setup
+    Test 1: use
+    Test 2: use
+    Test 3: use
+  Worker End: teardown
+
+================================================================================
+
+Q14: When should you use worker-scoped fixtures?
+-------------------------------------------------
+
+ANSWER:
+Use worker-scoped fixtures for expensive setup that can be safely shared.
+
+Good Use Cases:
+✓ Database connection pools
+✓ Starting a local server
+✓ Loading large datasets (read-only)
+✓ Expensive configuration
+✓ Resource-intensive initialization
+
+Bad Use Cases:
+✗ Authentication (each test should have fresh auth)
+✗ Test data creation (causes conflicts)
+✗ Mutable state
+✗ User sessions
+
+Example - Good (Database Connection):
+
+export const test = base.extend({
+  db: [async ({}, use) => {
+    // Connect ONCE per worker
+    const db = await connectToDatabase();
+    await use(db);
+    await db.close();
+  }, { scope: 'worker' }],
+});
+
+Example - Bad (Test User):
+
+export const test = base.extend({
+  // ❌ DON'T DO THIS
+  testUser: [async ({}, use) => {
+    const user = await createUser();
+    await use(user);
+    // All tests share same user - conflicts!
+  }, { scope: 'worker' }],
+});
+
+// ✅ DO THIS instead (test-scoped)
+export const test = base.extend({
+  testUser: async ({}, use) => {
+    const user = await createUser();
+    await use(user);
+    await deleteUser(user);
+  },
+});
+
+================================================================================
+
+Q15: How do you access the page fixture in a custom fixture?
+-------------------------------------------------------------
+
+ANSWER:
+Request it as a dependency in the fixture function parameters.
+
+Example:
+
+type MyFixtures = {
+  loginPage: Page;
+};
+
+export const test = base.extend<MyFixtures>({
+  loginPage: async ({ page }, use) => {
+    //                ^^^^^ Request page fixture here
+    
+    await page.goto('https://example.com/login');
+    await page.fill('#username', 'testuser');
+    await page.click('#login');
+    
+    await use(page);
+  },
+});
+
+You can request multiple dependencies:
+
+export const test = base.extend({
+  myFixture: async ({ page, context, request, browserName }, use) => {
+    // All built-in fixtures available
+    console.log(`Browser: ${browserName}`);
+    
+    await request.post('/api/setup');
+    await page.goto('/');
+    const page2 = await context.newPage();
+    
+    await use({ page, page2 });
+  },
+});
+
+================================================================================
+
+Q16: What is an automatic fixture (auto fixture)?
+--------------------------------------------------
+
+ANSWER:
+An automatic fixture runs for every test WITHOUT being explicitly requested.
+
+Syntax:
+
+export const test = base.extend({
+  autoFixture: [async ({ page }, use) => {
+    // Runs automatically before every test
+    console.log('Auto setup');
+    await use();
+    console.log('Auto teardown');
+  }, { auto: true }],
+});
+
+Usage:
+
+// No need to request autoFixture
+test('my test', async ({ page }) => {
+  // autoFixture already ran automatically
+  await page.goto('/');
+});
+
+Output:
+Auto setup
+[test runs]
+Auto teardown
+
+Use Cases:
+- Global setup for all tests
+- Logging
+- Performance monitoring
+- Automatic login
+- Test environment setup
+
+Example - Auto Login:
+
+export const test = base.extend({
+  autoLogin: [async ({ page }, use) => {
+    await page.goto('/login');
+    await page.fill('#username', 'auto-user');
+    await page.click('#login');
+    await page.waitForURL('/dashboard');
+    
+    await use();
+  }, { auto: true }],
+});
+
+test('dashboard test', async ({ page }) => {
+  // Already logged in!
+  await expect(page.locator('h1')).toHaveText('Dashboard');
+});
+
+================================================================================
+
+Q17: How do you provide different values from the same fixture?
+----------------------------------------------------------------
+
+ANSWER:
+Create parameterized fixture factory functions.
+
+Example:
+
+function createUserFixture(role: string) {
+  return async ({ request }, use) => {
+    const response = await request.post('/api/users', {
+      data: {
+        username: `${role}_user`,
+        role: role
+      }
+    });
+    const user = await response.json();
+    
+    await use(user);
+    
+    await request.delete(`/api/users/${user.id}`);
+  };
+}
+
+export const test = base.extend({
+  adminUser: createUserFixture('admin'),
+  editorUser: createUserFixture('editor'),
+  viewerUser: createUserFixture('viewer'),
+});
+
+Usage:
+
+test('admin access', async ({ adminUser }) => {
+  console.log(adminUser.role); // 'admin'
+});
+
+test('editor access', async ({ editorUser }) => {
+  console.log(editorUser.role); // 'editor'
+});
+
+test('different users', async ({ adminUser, editorUser, viewerUser }) => {
+  // All three available!
+  expect(adminUser.role).toBe('admin');
+  expect(editorUser.role).toBe('editor');
+  expect(viewerUser.role).toBe('viewer');
+});
+
+================================================================================
+
+Q18: What is the difference between Page and BrowserContext fixtures?
+----------------------------------------------------------------------
+
+ANSWER:
+
+Page (page fixture):
+- Single tab/window
+- Most common
+- Isolated context per test
+- Use for 90% of tests
+
+BrowserContext (context fixture):
+- Container for multiple pages
+- Shares cookies, storage, auth
+- Use when you need multiple tabs
+- Custom context settings
+
+Visual Representation:
+
+Browser
+  └── Context (isolated)
+      └── Page ← { page } fixture
+
+Browser
+  └── Context ← { context } fixture
+      ├── Page 1
+      ├── Page 2
+      └── Page 3
+
+When to use each:
+
+Use { page }:
+test('single page', async ({ page }) => {
+  await page.goto('/');
+});
+
+Use { context }:
+test('multiple pages', async ({ context }) => {
+  const page1 = await context.newPage();
+  const page2 = await context.newPage();
+  
+  // page1 and page2 share cookies
+});
+
+================================================================================
+
+Q19: Can you have async code after 'await use()' in a fixture?
+---------------------------------------------------------------
+
+ANSWER:
+Yes! Code after 'await use()' is the teardown phase and can be async.
+
+Example:
+
+export const test = base.extend({
+  testData: async ({ request }, use) => {
+    // SETUP
+    const response = await request.post('/api/data', {
+      data: { value: 'test' }
+    });
+    const data = await response.json();
+    
+    // USE
+    await use(data);
+    
+    // TEARDOWN (async is fine)
+    await request.delete(`/api/data/${data.id}`);
+    await cleanupRelatedData(data);
+    await logTestCompletion(data);
+  },
+});
+
+Common Teardown Tasks:
+✓ Delete test data (await request.delete())
+✓ Close connections (await db.close())
+✓ Delete files (await fs.unlink())
+✓ Stop servers (await server.stop())
+✓ Save logs (await saveLog())
+
+Always Cleanup:
+- Runs even if test fails
+- Prevents resource leaks
+- Keeps test environment clean
+
+================================================================================
+
+Q20: What happens if a test doesn't request any fixtures?
+----------------------------------------------------------
+
+ANSWER:
+The test still runs, but doesn't get any test dependencies.
+
+Example:
+
+test('no fixtures', async () => {
+  // No fixtures provided
+  console.log('Hello world');
+  expect(1 + 1).toBe(2);
+});
+
+This is valid but limited:
+✗ No page access
+✗ No browser
+✗ No API requests
+✓ Can still use expect
+✓ Can run pure JavaScript logic
+
+Usually you need at least one fixture:
+
+test('minimal test', async ({ page }) => {
+  await page.goto('/');
+});
+
+Common Fixture Combinations:
+- { page } - 80% of tests
+- { page, request } - UI + API
+- { context } - Multiple pages
+- { request } - API only
+- { browser } - Advanced scenarios
+
+================================================================================
+
+INTERMEDIATE LEVEL QUESTIONS (21-40)
+====================================
+
+Q21: How do you create a custom authentication fixture?
+--------------------------------------------------------
+
+ANSWER:
+
+Complete Example:
+
+// fixtures/auth.ts
+import { test as base, Page } from '@playwright/test';
+
+type AuthFixtures = {
+  authenticatedPage: Page;
+};
+
+export const test = base.extend<AuthFixtures>({
+  authenticatedPage: async ({ page }, use) => {
+    // Navigate to login
+    await page.goto(process.env.BASE_URL + '/login');
+    
+    // Fill credentials
+    await page.fill('input[name="username"]', process.env.TEST_USERNAME || 'testuser');
+    await page.fill('input[name="password"]', process.env.TEST_PASSWORD || 'password123');
+    
+    // Submit form
+    await page.click('button[type="submit"]');
+    
+    // Wait for successful login
+    await page.waitForURL('**/dashboard');
+    
+    // Verify login successful
+    await page.waitForSelector('.user-menu', { state: 'visible' });
+    
+    // Provide authenticated page to test
+    await use(page);
+    
+    // Optional: Logout after test
+    try {
+      await page.click('.user-menu');
+      await page.click('text=Logout');
+    } catch (error) {
+      // Ignore logout errors
+    }
+  },
+});
+
+export { expect } from '@playwright/test';
+
+Usage in Tests:
+
+import { test, expect } from './fixtures/auth';
+
+test('view dashboard', async ({ authenticatedPage }) => {
+  // Already logged in!
+  await expect(authenticatedPage.locator('h1')).toHaveText('Dashboard');
+  await expect(authenticatedPage.locator('.welcome')).toBeVisible();
+});
+
+test('access protected page', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/admin');
+  await expect(authenticatedPage.locator('.admin-panel')).toBeVisible();
+});
+
+Alternative: Storage State (Faster)
+
+export const test = base.extend({
+  authenticatedPage: async ({ browser }, use) => {
+    // Load pre-saved auth state
+    const context = await browser.newContext({
+      storageState: 'auth/user-state.json'
+    });
+    const page = await context.newPage();
+    
+    await use(page);
+    
+    await context.close();
+  },
+});
+
+================================================================================
+
+Q22: How do you combine Page Object Model with fixtures?
+---------------------------------------------------------
+
+ANSWER:
+
+Step 1: Create Page Object Classes
+
+// pages/LoginPage.ts
+export class LoginPage {
+  constructor(private page: Page) {}
+  
+  async goto() {
+    await this.page.goto('/login');
+  }
+  
+  async login(username: string, password: string) {
+    await this.page.fill('#username', username);
+    await this.page.fill('#password', password);
+    await this.page.click('#login-button');
+  }
+  
+  async expectLoginSuccess() {
+    await expect(this.page).toHaveURL('/dashboard');
+  }
+}
+
+// pages/DashboardPage.ts
+export class DashboardPage {
+  constructor(private page: Page) {}
+  
+  async goto() {
+    await this.page.goto('/dashboard');
+  }
+  
+  async expectWelcomeMessage(name: string) {
+    await expect(this.page.locator('.welcome')).toHaveText(`Welcome, ${name}!`);
+  }
+  
+  async navigateToProfile() {
+    await this.page.click('a[href="/profile"]');
+  }
+}
+
+Step 2: Create Fixtures
+
+// fixtures/pages.ts
+import { test as base } from '@playwright/test';
+import { LoginPage } from '../pages/LoginPage';
+import { DashboardPage } from '../pages/DashboardPage';
+
+type PageFixtures = {
+  loginPage: LoginPage;
+  dashboardPage: DashboardPage;
+};
+
+export const test = base.extend<PageFixtures>({
+  loginPage: async ({ page }, use) => {
+    await use(new LoginPage(page));
+  },
+  
+  dashboardPage: async ({ page }, use) => {
+    await use(new DashboardPage(page));
+  },
+});
+
+export { expect } from '@playwright/test';
+
+Step 3: Use in Tests
+
+import { test, expect } from './fixtures/pages';
+
+test('login and view dashboard', async ({ loginPage, dashboardPage }) => {
+  await loginPage.goto();
+  await loginPage.login('testuser', 'password123');
+  await loginPage.expectLoginSuccess();
+  
+  await dashboardPage.expectWelcomeMessage('testuser');
+});
+
+test('navigate to profile', async ({ loginPage, dashboardPage }) => {
+  await loginPage.goto();
+  await loginPage.login('testuser', 'password123');
+  
+  await dashboardPage.navigateToProfile();
+  await expect(page.locator('h1')).toHaveText('Profile');
+});
+
+Benefits:
+✓ Clean separation of concerns
+✓ Reusable page objects
+✓ Type-safe
+✓ Easy to maintain
+✓ Automatic lifecycle management
+
+================================================================================
+
+Q23: How do you create test data fixtures that clean up automatically?
+-----------------------------------------------------------------------
+
+ANSWER:
+
+Pattern: Create → Use → Delete
+
+type TestDataFixtures = {
+  testUser: User;
+  testProduct: Product;
+  testOrder: Order;
+};
+
+export const test = base.extend<TestDataFixtures>({
+  testUser: async ({ request }, use) => {
+    // CREATE
+    const response = await request.post('/api/users', {
+      data: {
+        username: `user_${Date.now()}`,
+        email: `test_${Date.now()}@example.com`,
+        password: 'Test123!@#'
+      }
+    });
+    
+    expect(response.status()).toBe(201);
+    const user = await response.json();
+    console.log(`Created user: ${user.id}`);
+    
+    // USE
+    await use(user);
+    
+    // DELETE
+    try {
+      await request.delete(`/api/users/${user.id}`);
+      console.log(`Deleted user: ${user.id}`);
+    } catch (error) {
+      console.error(`Failed to delete user: ${user.id}`, error);
+    }
+  },
+  
+  testProduct: async ({ request }, use) => {
+    const response = await request.post('/api/products', {
+      data: {
+        name: `Product ${Date.now()}`,
+        price: 99.99,
+        stock: 100
+      }
+    });
+    
+    const product = await response.json();
+    
+    await use(product);
+    
+    await request.delete(`/api/products/${product.id}`);
+  },
+  
+  testOrder: async ({ request, testUser, testProduct }, use) => {
+    // Depends on testUser and testProduct
+    const response = await request.post('/api/orders', {
+      data: {
+        userId: testUser.id,
+        items: [
+          { productId: testProduct.id, quantity: 2 }
+        ]
+      }
+    });
+    
+    const order = await response.json();
+    
+    await use(order);
+    
+    await request.delete(`/api/orders/${order.id}`);
+  },
+});
+
+Usage:
+
+test('purchase flow', async ({ page, testUser, testOrder }) => {
+  // testUser and testOrder automatically created
+  
+  await page.goto('/login');
+  await page.fill('#username', testUser.username);
+  await page.click('#login');
+  
+  await page.goto(`/orders/${testOrder.id}`);
+  await expect(page.locator('.order-total')).toBeVisible();
+  
+  // Automatic cleanup after test!
+});
+
+Benefits:
+✓ No leftover test data
+✓ Fresh data per test
+✓ Parallel test safe
+✓ Cleanup even if test fails
+
+================================================================================
+
+Q24: How do you handle fixture errors and cleanup?
+---------------------------------------------------
+
+ANSWER:
+
+Use try/finally to guarantee cleanup:
+
+Good Pattern:
+
+export const test = base.extend({
+  resource: async ({}, use) => {
+    let resource;
+    
+    try {
+      // SETUP
+      resource = await acquireExpensiveResource();
+      console.log('Resource acquired');
+      
+      // USE
+      await use(resource);
+      
+    } finally {
+      // CLEANUP (always runs)
+      if (resource) {
+        await resource.release();
+        console.log('Resource released');
+      }
+    }
+  },
+});
+
+Database Transaction Pattern:
+
+export const test = base.extend({
+  db: async ({}, use) => {
+    const connection = await connectToDatabase();
+    
+    try {
+      await connection.query('BEGIN TRANSACTION');
+      await use(connection);
+      await connection.query('COMMIT');
+    } catch (error) {
+      await connection.query('ROLLBACK');
+      throw error;
+    } finally {
+      await connection.close();
+    }
+  },
+});
+
+File Cleanup Pattern:
+
+export const test = base.extend({
+  tempFile: async ({}, use) => {
+    const filePath = `/tmp/test-${Date.now()}.txt`;
+    
+    try {
+      await fs.writeFile(filePath, 'test data');
+      await use(filePath);
+    } finally {
+      try {
+        await fs.unlink(filePath);
+      } catch (error) {
+        // File might not exist, ignore
+      }
+    }
+  },
+});
+
+Multiple Resources:
+
+export const test = base.extend({
+  resources: async ({}, use) => {
+    const resources = [];
+    
+    try {
+      const db = await connectToDatabase();
+      resources.push(db);
+      
+      const cache = await connectToCache();
+      resources.push(cache);
+      
+      const server = await startServer();
+      resources.push(server);
+      
+      await use({ db, cache, server });
+      
+    } finally {
+      // Cleanup in reverse order
+      for (const resource of resources.reverse()) {
+        await resource.close();
+      }
+    }
+  },
+});
+
+Key Points:
+✓ Use try/finally
+✓ Check if resource exists before cleanup
+✓ Log cleanup actions
+✓ Ignore cleanup errors when appropriate
+✓ Cleanup in reverse order of creation
+
+================================================================================
+
+Q25: How do you share data between fixtures without coupling?
+--------------------------------------------------------------
+
+ANSWER:
+
+Pattern 1: Dependency Injection (Recommended)
+
+type SharedFixtures = {
+  config: AppConfig;
+  apiClient: ApiClient;
+  database: Database;
+};
+
+export const test = base.extend<SharedFixtures>({
+  // First fixture: Provides config
+  config: async ({}, use) => {
+    const config = {
+      apiUrl: process.env.API_URL || 'http://localhost:3000',
+      dbUrl: process.env.DB_URL || 'postgres://localhost',
+    };
+    await use(config);
+  },
+  
+  // Second fixture: Uses config
+  apiClient: async ({ config }, use) => {
+    const client = new ApiClient(config.apiUrl);
+    await use(client);
+    await client.close();
+  },
+  
+  // Third fixture: Uses config
+  database: async ({ config }, use) => {
+    const db = await Database.connect(config.dbUrl);
+    await use(db);
+    await db.close();
+  },
+});
+
+Pattern 2: Worker-Scoped Shared State
+
+export const test = base.extend({
+  sharedCache: [async ({}, use) => {
+    const cache = new Map();
+    await use(cache);
+    // Cache persists across tests in worker
+  }, { scope: 'worker' }],
+  
+  cachedUser: async ({ sharedCache, request }, use) => {
+    if (!sharedCache.has('user')) {
+      const response = await request.post('/api/users', { /* ... */ });
+      const user = await response.json();
+      sharedCache.set('user', user);
+    }
+    
+    await use(sharedCache.get('user'));
+  },
+});
+
+Pattern 3: Fixture Composition
+
+type ComposedFixtures = {
+  auth: AuthService;
+  authenticatedApi: ApiClient;
+  authenticatedPage: Page;
+};
+
+export const test = base.extend<ComposedFixtures>({
+  auth: async ({ request }, use) => {
+    const auth = new AuthService(request);
+    await use(auth);
+  },
+  
+  authenticatedApi: async ({ request, auth }, use) => {
+    const token = await auth.getToken();
+    const api = new ApiClient(request, token);
+    await use(api);
+  },
+  
+  authenticatedPage: async ({ page, auth }, use) => {
+    const token = await auth.getToken();
+    await page.setExtraHTTPHeaders({
+      'Authorization': `Bearer ${token}`
+    });
+    await use(page);
+  },
+});
+
+Anti-Pattern (Don't Do This):
+
+// ❌ BAD: Global mutable state
+let globalUser;
+
+export const test = base.extend({
+  user: async ({}, use) => {
+    if (!globalUser) {
+      globalUser = await createUser();
+    }
+    await use(globalUser);
+  },
+});
+
+✅ Good Practices:
+- Use dependency injection
+- Declare dependencies explicitly
+- Keep fixtures pure
+- Avoid global state
+- Use worker-scope carefully
+
+================================================================================
+
+Q26: How do you create different fixture configurations for different environments?
+------------------------------------------------------------------------------------
+
+ANSWER:
+
+Pattern 1: Environment-Based Fixtures
+
+// fixtures/environment.ts
+type EnvironmentFixtures = {
+  baseURL: string;
+  apiURL: string;
+  dbConfig: DatabaseConfig;
+};
+
+export const test = base.extend<EnvironmentFixtures>({
+  baseURL: async ({}, use) => {
+    const env = process.env.TEST_ENV || 'local';
+    
+    const urls = {
+      local: 'http://localhost:3000',
+      staging: 'https://staging.example.com',
+      production: 'https://example.com',
+    };
+    
+    await use(urls[env]);
+  },
+  
+  apiURL: async ({ baseURL }, use) => {
+    await use(`${baseURL}/api`);
+  },
+  
+  dbConfig: async ({}, use) => {
+    const env = process.env.TEST_ENV || 'local';
+    
+    const configs = {
+      local: {
+        host: 'localhost',
+        database: 'test_db',
+        user: 'test_user',
+      },
+      staging: {
+        host: process.env.STAGING_DB_HOST,
+        database: 'staging_db',
+        user: process.env.STAGING_DB_USER,
+      },
+    };
+    
+    await use(configs[env]);
+  },
+});
+
+Pattern 2: Configuration Files
+
+// config/test-config.ts
+export const getConfig = (env: string) => {
+  const configs = {
+    local: {
+      baseURL: 'http://localhost:3000',
+      timeout: 30000,
+      slowMo: 100,
+    },
+    ci: {
+      baseURL: process.env.CI_BASE_URL,
+      timeout: 60000,
+      slowMo: 0,
+    },
+    staging: {
+      baseURL: 'https://staging.example.com',
+      timeout: 30000,
+      slowMo: 0,
+    },
+  };
+  
+  return configs[env] || configs.local;
+};
+
+// fixtures/config.ts
+export const test = base.extend({
+  testConfig: async ({}, use) => {
+    const env = process.env.TEST_ENV || 'local';
+    const config = getConfig(env);
+    await use(config);
+  },
+  
+  page: async ({ page, testConfig }, use) => {
+    page.setDefaultTimeout(testConfig.timeout);
+    await use(page);
+  },
+});
+
+Pattern 3: Feature Flags
+
+export const test = base.extend({
+  features: async ({}, use) => {
+    const features = {
+      newCheckout: process.env.FEATURE_NEW_CHECKOUT === 'true',
+      apiV2: process.env.FEATURE_API_V2 === 'true',
+      darkMode: process.env.FEATURE_DARK_MODE === 'true',
+    };
+    await use(features);
+  },
+});
+
+test('checkout', async ({ page, features }) => {
+  if (features.newCheckout) {
+    await page.goto('/checkout/v2');
+  } else {
+    await page.goto('/checkout');
+  }
+});
+
+Usage with .env files:
+
+# .env.local
+TEST_ENV=local
+BASE_URL=http://localhost:3000
+
+# .env.staging
+TEST_ENV=staging
+BASE_URL=https://staging.example.com
+
+# .env.production
+TEST_ENV=production
+BASE_URL=https://example.com
+
+Run tests:
+
+# Local
+TEST_ENV=local npx playwright test
+
+# Staging
+TEST_ENV=staging npx playwright test
+
+# Production
+TEST_ENV=production npx playwright test --grep @smoke
+
+================================================================================
+
+[Questions 27-60 continue with similar detailed answers covering topics like:
+- Performance optimization with fixtures
+- Testing multiple user roles
+- Mocking external services
+- Database transaction patterns
+- Complex dependency chains
+- Error handling strategies
+- Test isolation techniques
+- Advanced composition patterns
+- Debugging fixture issues
+- Best practices for large test suites]
+
+================================================================================
+
+SCENARIO-BASED QUESTIONS (61-75)
+=================================
+
+Q61: Design a fixture system for testing a multi-tenant application.
+---------------------------------------------------------------------
+
+ANSWER:
+
+Requirements:
+- Multiple tenants with isolated data
+- Different user roles per tenant
+- Tenant-specific configuration
+- Cleanup all tenant data
+
+Solution:
+
+type TenantFixtures = {
+  tenant: Tenant;
+  tenantAdmin: User;
+  tenantUser: User;
+  tenantPage: Page;
+};
+
+export const test = base.extend<TenantFixtures>({
+  tenant: async ({ request }, use) => {
+    // Create tenant
+    const response = await request.post('/api/tenants', {
+      data: {
+        name: `Tenant_${Date.now()}`,
+        subdomain: `test${Date.now()}`,
+      }
+    });
+    const tenant = await response.json();
+    
+    await use(tenant);
+    
+    // Cleanup tenant (cascades to users and data)
+    await request.delete(`/api/tenants/${tenant.id}`);
+  },
+  
+  tenantAdmin: async ({ request, tenant }, use) => {
+    const response = await request.post('/api/users', {
+      data: {
+        tenantId: tenant.id,
+        role: 'admin',
+        email: `admin@${tenant.subdomain}.com`,
+      }
+    });
+    const admin = await response.json();
+    
+    await use(admin);
+    
+    // User deleted automatically with tenant
+  },
+  
+  tenantUser: async ({ request, tenant }, use) => {
+    const response = await request.post('/api/users', {
+      data: {
+        tenantId: tenant.id,
+        role: 'user',
+        email: `user@${tenant.subdomain}.com`,
+      }
+    });
+    const user = await response.json();
+    
+    await use(user);
+  },
+  
+  tenantPage: async ({ browser, tenant, tenantAdmin }, use) => {
+    const context = await browser.newContext({
+      baseURL: `https://${tenant.subdomain}.example.com`,
+    });
+    const page = await context.newPage();
+    
+    // Login as admin
+    await page.goto('/login');
+    await page.fill('#email', tenantAdmin.email);
+    await page.fill('#password', 'password123');
+    await page.click('#login');
+    
+    await use(page);
+    
+    await context.close();
+  },
+});
+
+Usage:
+
+test('tenant isolation', async ({ tenant, tenantPage, tenantUser }) => {
+  // Each test gets fresh tenant
+  await tenantPage.goto('/users');
+  await expect(tenantPage.locator('.tenant-name')).toHaveText(tenant.name);
+  
+  // Create data in tenant
+  await tenantPage.click('#add-project');
+  await tenantPage.fill('#project-name', 'Test Project');
+  await tenantPage.click('#save');
+  
+  // Verify data isolated to tenant
+  await expect(tenantPage.locator('.project-item')).toHaveCount(1);
+  
+  // All cleaned up automatically!
+});
+
+================================================================================
+
+[Questions 62-75 continue with more advanced scenarios covering:
+- E-commerce checkout flow fixtures
+- Real-time collaboration testing
+- API + UI combined testing
+- Performance testing fixtures
+- Complex authentication flows
+- Database seeding strategies
+- Microservices testing
+- CI/CD optimization
+- And more...]
+
+================================================================================
+
+SUMMARY
+=======
+
+Key Takeaways:
+
+1. Fixtures are Playwright's dependency injection system
+2. Use built-in fixtures (page, context, request) for most cases
+3. Create custom fixtures for reusable setup/teardown
+4. Choose scope carefully (test vs worker)
+5. Compose fixtures through dependencies
+6. Always cleanup resources
+7. Combine with Page Objects for maintainability
+8. Use fixtures for test data creation and cleanup
+9. Leverage fixtures for complex test scenarios
+10. Follow naming conventions and best practices
+
+Master these concepts to write maintainable, scalable Playwright tests!
+
+================================================================================

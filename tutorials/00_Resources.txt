@@ -1,0 +1,220 @@
+================================================================================
+                    PLAYWRIGHT - LEARNING RESOURCES
+================================================================================
+
+This file contains curated URLs and resources for learning Playwright.
+Use these alongside the tutorial files for comprehensive understanding.
+
+================================================================================
+                            OFFICIAL DOCUMENTATION
+================================================================================
+
+📚 Playwright Introduction & Getting Started
+URL: https://playwright.dev/docs/intro
+Description: Official Playwright introduction, installation guide, and first steps.
+             Essential starting point for all Playwright learners.
+
+Topics Covered:
+- What is Playwright and why use it
+- Installation and setup
+- Writing your first test
+- Running tests and viewing results
+- Getting started with different languages (TypeScript, JavaScript, Python, .NET, Java)
+- System requirements and browser installation
+
+📚 Playwright Official Locators Documentation
+URL: https://playwright.dev/docs/locators
+Description: Official Playwright documentation covering all locator strategies,
+             best practices, and detailed API references.
+
+Topics Covered:
+- Locator strategies (getByRole, getByText, getByLabel, etc.)
+- Chaining and filtering locators
+- Lists and collections
+- Assertions with locators
+- Auto-waiting and retries
+- Best practices and anti-patterns
+
+================================================================================
+                            VIDEO TUTORIALS
+================================================================================
+
+🎥 Playwright Locators - Complete Tutorial
+URL: https://www.youtube.com/watch?v=ZAZg5wzSCpM&list=PLUDwpEzHYYLtvMVjc-Va3RXLKtdB-ofc2&index=2
+Platform: YouTube
+Description: Comprehensive video tutorial covering Playwright locators from basics
+             to advanced concepts. Part of a complete Playwright tutorial series.
+
+Topics Covered:
+- Introduction to Playwright locators
+- Different locator strategies explained
+- Practical examples and demonstrations
+- Best practices for writing maintainable locators
+- Common pitfalls and how to avoid them
+
+================================================================================
+                        RECOMMENDED LEARNING PATH
+================================================================================
+
+Step 0: Get Started with Playwright
+   └─> https://playwright.dev/docs/intro
+       Begin here - installation, setup, and your first test
+
+Step 1: Study Tutorial Files (This Repository)
+   
+   📂 STEP 1: Fundamentals (Files 01-03)
+   ├─> 01_Fundamentals_Complete_Guide.txt
+   │   Learn Playwright basics, syntax, core concepts
+   ├─> 02_Fundamentals_Interview_Questions.txt
+   │   Test your knowledge with Q&A
+   └─> 03_Fundamentals_Practical_Examples.txt
+       Hands-on code examples to practice
+
+   📂 STEP 2: Fixtures (Files 04-06)
+   ├─> 04_Fixtures_Complete_Guide.txt
+   │   Understand dependency injection & test architecture
+   ├─> 05_Fixtures_Interview_Questions.txt
+   │   Master fixtures with Q&A
+   └─> 06_Fixtures_Practical_Examples.txt
+       Real-world fixture patterns
+
+   📂 STEP 3: Locators (Files 07-09)
+   ├─> 07_Locators_Complete_Guide.txt
+   │   Master element finding strategies
+   ├─> 08_Locators_Interview_Questions.txt
+   │   Test your knowledge with Q&A
+   └─> 09_Locators_Practical_Examples.txt
+       Hands-on code examples to practice
+
+   📂 STEP 4: Advanced Topics (Files 10-12)
+   ├─> 10_Advanced_Topics_Complete_Guide.txt
+   │   Visual regression, performance, API testing, CI/CD
+   ├─> 11_Advanced_Topics_Interview_Questions.txt
+   │   Advanced concepts Q&A
+   └─> 12_Advanced_Topics_Practical_Examples.txt
+       Production-ready advanced examples
+
+Step 2: Read Official Documentation
+   └─> https://playwright.dev/docs/locators
+       Deep dive into locators and best practices
+
+Step 3: Watch Video Tutorial
+   └─> https://www.youtube.com/watch?v=ZAZg5wzSCpM&list=PLUDwpEzHYYLtvMVjc-Va3RXLKtdB-ofc2&index=2
+       Visual learning with practical demonstrations
+
+Step 4: Practice & Experiment
+   └─> Apply what you learned in real projects
+
+================================================================================
+                        ADDITIONAL RESOURCES
+================================================================================
+
+🔗 Playwright Best Practices - Locators
+URL: https://playwright.dev/docs/best-practices
+Description: Best practices guide including locator recommendations
+
+🔗 Playwright API Reference - Locators
+URL: https://playwright.dev/docs/api/class-locator
+Description: Detailed API documentation for the Locator class
+
+🔗 Playwright Selectors Guide
+URL: https://playwright.dev/docs/selectors
+Description: Deep dive into selector engines and strategies
+
+🔗 Playwright Testing Library Integration
+URL: https://playwright.dev/docs/other-locators
+Description: Alternative locator strategies and integration options
+
+================================================================================
+                            QUICK REFERENCE
+================================================================================
+
+Most Common Locator Methods:
+- page.getByRole()        → Recommended for accessibility
+- page.getByText()        → Find by visible text
+- page.getByLabel()       → Find form inputs by label
+- page.getByPlaceholder() → Find by placeholder attribute
+- page.getByAltText()     → Find images by alt text
+- page.getByTitle()       → Find by title attribute
+- page.getByTestId()      → Find by test-id attribute
+- page.locator()          → CSS/XPath selectors (fallback)
+
+Chaining & Filtering:
+- locator.filter()        → Filter by text or other locators
+- locator.first()         → Get first matching element
+- locator.last()          → Get last matching element
+- locator.nth()           → Get nth matching element
+- locator.and()           → Combine multiple conditions
+- locator.or()            → Match any of the conditions
+
+================================================================================
+                            PRACTICE EXERCISES
+================================================================================
+
+After reviewing the resources above, try these exercises:
+
+1. Build a test using only recommended locators (getByRole, getByText, etc.)
+2. Practice chaining locators to find nested elements
+3. Create tests that handle dynamic lists and collections
+4. Implement page object models using locator best practices
+5. Write tests that are resilient to UI changes
+
+================================================================================
+                            COMMUNITY RESOURCES
+================================================================================
+
+💬 Playwright Discord Server
+URL: https://aka.ms/playwright/discord
+Description: Join the community for help and discussions
+
+💬 Stack Overflow - Playwright Tag
+URL: https://stackoverflow.com/questions/tagged/playwright
+Description: Q&A for common Playwright locator issues
+
+💬 GitHub Discussions
+URL: https://github.com/microsoft/playwright/discussions
+Description: Official Playwright community discussions
+
+================================================================================
+                            NOTES & TIPS
+================================================================================
+
+✅ DO:
+- Prefer user-facing attributes (role, text, label)
+- Use getByRole() whenever possible for accessibility
+- Chain locators for precise targeting
+- Keep locators simple and maintainable
+- Use data-testid for dynamic content when needed
+
+❌ DON'T:
+- Avoid fragile CSS selectors based on structure
+- Don't rely on XPath unless absolutely necessary
+- Avoid using text selectors for frequently changing content
+- Don't use generated class names or IDs
+- Avoid overly complex locator chains
+
+💡 Pro Tips:
+- Use Playwright Inspector to debug locators (npx playwright codegen)
+- Enable strict mode to catch ambiguous locators
+- Write locators that work across different viewports
+- Test locators in multiple browsers
+- Document complex locator strategies in your code
+
+================================================================================
+                            UPDATE LOG
+================================================================================
+
+2025-12-28: File created with initial resources
+            - Added official documentation link
+            - Added YouTube tutorial video
+            - Included learning path and best practices
+
+================================================================================
+
+For related topics, see:
+- Files 01-03: Fundamentals
+- Files 04-06: Locators (Complete Guide, Questions, Examples)
+- Files 07-09: Advanced Topics
+- File 10: This resources file
+
+Last Updated: December 28, 2025

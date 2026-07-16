@@ -1,0 +1,2387 @@
+================================================================================
+                    PLAYWRIGHT ACTIONS - COMPLETE GUIDE
+        User Interactions with HTML Elements (Input/Keyboard/Mouse)
+================================================================================
+
+Source: https://playwright.dev/docs/input
+Tutorial Date: December 2025
+
+TABLE OF CONTENTS
+=================
+
+1. Actions Introduction & Core Concepts
+2. Text Input Actions
+3. Checkbox & Radio Button Actions
+4. Select Dropdown Actions
+5. Mouse Click Actions
+6. Keyboard Actions
+7. File Upload Actions
+8. Focus Element Actions
+9. Drag and Drop Actions
+10. Scrolling Actions
+11. Advanced Action Patterns
+12. Action Timeouts & Retries
+13. Best Practices & Troubleshooting
+
+================================================================================
+SECTION 1: ACTIONS INTRODUCTION & CORE CONCEPTS
+================================================================================
+
+WHAT ARE ACTIONS IN PLAYWRIGHT?
+
+Actions are methods that simulate real user interactions with HTML elements.
+Playwright provides a comprehensive API to interact with:
+  • Text inputs (text, email, password, date, time fields)
+  • Checkboxes and radio buttons
+  • Select dropdowns
+  • Buttons (single, double, right-click)
+  • Keyboard keys and shortcuts
+  • File uploads
+  • Form focus
+  • Drag and drop operations
+  • Scrolling
+
+WHY USE PLAYWRIGHT ACTIONS?
+
+Traditional approach (DOM manipulation):
+  ✗ Doesn't reflect actual user behavior
+  ✗ Doesn't trigger all events (focus, blur, input, change)
+  ✗ Doesn't work with dynamically hidden elements
+  ✗ Ignores JavaScript event listeners
+  ✗ Breaks on page animations
+
+Playwright actions approach:
+  ✓ Simulates real user interactions
+  ✓ Triggers all relevant browser events
+  ✓ Waits for elements to be actionable
+  ✓ Automatically scrolls elements into view
+  ✓ Handles dynamic content gracefully
+  ✓ Works across Chromium, Firefox, WebKit
+
+ACTION SAFETY FEATURES (Built-in Actionability Checks)
+
+Before any action, Playwright automatically:
+
+1. ELEMENT STABILITY
+   └─ Waits for element to be in DOM
+   └─ Waits for display (not hidden)
+   └─ Waits for non-zero dimensions
+
+2. VISIBILITY
+   └─ Waits for visibility:hidden to be false
+   └─ Waits for display:none to be false
+   └─ Waits for opacity > 0
+
+3. MOTION
+   └─ Waits for CSS transitions to complete
+   └─ Waits for animations to finish
+   └─ Waits for element to stop moving
+
+4. POSITIONING
+   └─ Scrolls element into view automatically
+   └─ Positions element in viewport
+
+5. INTERACTIVITY
+   └─ Waits for pointer events (not obscured)
+   └─ Waits for element to be enabled
+   └─ Waits for no overlay elements
+
+6. RESILIENCE
+   └─ Auto-retries if element detaches
+   └─ Handles dynamic DOM changes
+   └─ Waits for JavaScript to settle
+
+ACTION TIMEOUT
+
+Default: 30 seconds per action
+Configurable at:
+  • Test level: test.setTimeout(60000)
+  • Global level: timeout in playwright.config.ts
+  • Action level: await locator.click({ timeout: 5000 })
+
+================================================================================
+CRITICAL CONCEPT: inputValue() vs textContent - WHEN TO USE WHICH
+================================================================================
+
+Two methods to extract text/values from elements. UNDERSTAND THE DIFFERENCE.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           QUICK COMPARISON                                 │
+├──────────────────┬──────────────────────┬──────────────────────────────────┤
+│ Feature          │ inputValue()         │ textContent()                    │
+├──────────────────┼──────────────────────┼──────────────────────────────────┤
+│ Works on         │ Form inputs only     │ ANY element                      │
+│ Element types    │ <input>, <textarea>, │ <button>, <div>, <span>,        │
+│                  │ <select>             │ <a>, <p>, etc.                  │
+│ Returns          │ VALUE attribute      │ All text content                │
+│ Return type      │ string | null        │ string | null                   │
+│ Use case         │ Form field values    │ Button text, labels, messages   │
+│ Hidden content   │ Returns value anyway │ Includes hidden text            │
+│ Whitespace       │ Preserved            │ Included and normalized         │
+└──────────────────┴──────────────────────┴──────────────────────────────────┘
+
+CRITICAL EXAMPLES - These Show The ACTUAL Difference
+
+EXAMPLE 1: Simple Text Input
+─────────────────────────────
+HTML:
+  <input type="text" id="email" value="user@example.com" placeholder="Enter email">
+
+CODE:
+  const input = page.locator('#email');
+  const inputVal = await input.inputValue();      // "user@example.com"
+  const textContent = await input.textContent();  // ""
+
+RESULT:
+  inputValue()  → "user@example.com"  ✓ Correct - this is the VALUE
+  textContent   → ""                  ✗ Empty - inputs have no text content
+
+WHEN TO USE:
+  Use inputValue() for input fields ✓
+
+EXAMPLE 2: Password Input
+──────────────────────────
+HTML:
+  <input type="password" id="pass" value="secret123">
+
+CODE:
+  const input = page.locator('#pass');
+  const inputVal = await input.inputValue();      // "secret123"
+  const textContent = await input.textContent();  // ""
+
+RESULT:
+  inputValue()  → "secret123"         ✓ Returns the actual value (not masked)
+  textContent   → ""                  ✗ Empty - inputs have no text
+
+UI DISPLAY: ••••••••  (masked to user, but value is stored plaintext in HTML)
+
+WHEN TO USE:
+  Use inputValue() for password fields ✓
+
+EXAMPLE 3: Textarea
+────────────────────
+HTML:
+  <textarea id="comments">My feedback\nLine 2\nLine 3</textarea>
+
+CODE:
+  const textarea = page.locator('#comments');
+  const inputVal = await textarea.inputValue();      // "My feedback\nLine 2\nLine 3"
+  const textContent = await textarea.textContent();  // "My feedback\nLine 2\nLine 3"
+
+RESULT:
+  inputValue()  → "My feedback\nLine 2\nLine 3"  ✓ Correct
+  textContent   → "My feedback\nLine 2\nLine 3"  ✓ Also works for textarea
+
+WHEN TO USE:
+  Use inputValue() for textarea (standard for form inputs) ✓
+  textContent also works but inputValue() is the standard
+
+EXAMPLE 4: Select Dropdown
+────────────────────────────
+HTML:
+  <select id="country">
+    <option value="us">United States</option>
+    <option value="ca" selected>Canada</option>
+  </select>
+
+CODE:
+  const select = page.locator('#country');
+  const inputVal = await select.inputValue();      // "ca"
+  const textContent = await select.textContent();  // "United States\nCanada"
+
+RESULT:
+  inputValue()  → "ca"                       ✓ Selected option VALUE
+  textContent   → "United States\nCanada"    ✗ All option text, not selected
+
+WHEN TO USE:
+  Use inputValue() to get the selected value ✓
+
+EXAMPLE 5: Button Element
+──────────────────────────
+HTML:
+  <button id="submit">Click Me Now</button>
+
+CODE:
+  const button = page.locator('#submit');
+  const inputVal = await button.inputValue();      // null
+  const textContent = await button.textContent();  // "Click Me Now"
+
+RESULT:
+  inputValue()  → null                ✗ Buttons are not form inputs
+  textContent   → "Click Me Now"      ✓ Correct - button's displayed text
+
+WHEN TO USE:
+  Use textContent() for buttons ✓
+
+EXAMPLE 6: Link (Anchor)
+────────────────────────
+HTML:
+  <a href="/login" id="login-link">Sign In</a>
+
+CODE:
+  const link = page.locator('#login-link');
+  const inputVal = await link.inputValue();      // null
+  const textContent = await link.textContent();  // "Sign In"
+
+RESULT:
+  inputValue()  → null        ✗ Links are not form inputs
+  textContent   → "Sign In"   ✓ Correct - link's displayed text
+
+WHEN TO USE:
+  Use textContent() for links ✓
+
+EXAMPLE 7: Div Container
+────────────────────────
+HTML:
+  <div id="message" class="success">Order Confirmed! Your ID is #12345</div>
+
+CODE:
+  const div = page.locator('#message');
+  const inputVal = await div.inputValue();      // null
+  const textContent = await div.textContent();  // "Order Confirmed! Your ID is #12345"
+
+RESULT:
+  inputValue()  → null                                  ✗ Not a form input
+  textContent   → "Order Confirmed! Your ID is #12345" ✓ Correct
+
+WHEN TO USE:
+  Use textContent() for divs, message containers ✓
+
+EXAMPLE 8: Span with Hidden Text
+─────────────────────────────────
+HTML:
+  <span id="status">
+    Status: <span style="display:none">processing</span> Complete
+  </span>
+
+CODE:
+  const span = page.locator('#status');
+  const inputVal = await span.inputValue();      // null
+  const textContent = await span.textContent();  // "Status: processing Complete"
+
+RESULT:
+  inputValue()  → null                        ✗ Not a form input
+  textContent   → "Status: processing Complete" ✓ Includes hidden text too
+
+WHEN TO USE:
+  Use textContent() - but note it includes hidden text
+
+DECISION TREE: Which One to Use?
+─────────────────────────────────
+
+START: I need to get text/value from an element
+
+Q1: Is it a form input? (<input>, <textarea>, <select>)
+    YES → Use inputValue()
+    NO  → Go to Q2
+
+Q2: Is it any other element? (button, div, span, link, etc.)
+    YES → Use textContent()
+    MAYBE → Try inputValue() first, fall back to textContent()
+
+SIMPLE RULE:
+  • Form inputs? → inputValue()
+  • Anything else? → textContent()
+  • Unsure? → inputValue() returns null for non-inputs, try that first
+
+COMMON MISTAKES
+
+MISTAKE 1: Using textContent on input field
+────────────────────────────────────────────
+❌ WRONG:
+const email = page.locator('#email');
+const value = await email.textContent();  // Returns ""
+expect(value).toBe('user@example.com');    // Fails! textContent is empty
+
+✓ CORRECT:
+const email = page.locator('#email');
+const value = await email.inputValue();   // Returns "user@example.com"
+expect(value).toBe('user@example.com');    // Passes!
+
+MISTAKE 2: Using inputValue on button
+──────────────────────────────────────
+❌ WRONG:
+const button = page.locator('button');
+const text = await button.inputValue();  // Returns null
+expect(text).toBe('Submit');              // Fails! inputValue is null
+
+✓ CORRECT:
+const button = page.locator('button');
+const text = await button.textContent();  // Returns "Submit"
+expect(text).toBe('Submit');              // Passes!
+
+MISTAKE 3: Using inputValue on select to get label
+──────────────────────────────────────────────────
+❌ WRONG (if you want the label):
+const select = page.locator('#country');
+await select.selectOption('ca');
+const label = await select.inputValue();  // Returns "ca" (the VALUE)
+expect(label).toBe('Canada');             // Fails! Returns "ca" not "Canada"
+
+✓ CORRECT (if you want the VALUE):
+const select = page.locator('#country');
+await select.selectOption('ca');
+const value = await select.inputValue();  // Returns "ca" (the VALUE)
+expect(value).toBe('ca');                 // Passes!
+
+✓ CORRECT (if you want the LABEL):
+const select = page.locator('#country');
+const selectedOption = select.locator('option:checked');
+const label = await selectedOption.textContent();  // Returns "Canada"
+expect(label).toBe('Canada');  // Passes!
+
+PRACTICAL TESTING EXAMPLES
+
+Example 1: Verify Form Field Value
+──────────────────────────────────
+test('verify form field', async ({ page }) => {
+  const emailField = page.locator('#email');
+  await emailField.fill('user@example.com');
+  
+  // Get VALUE from input field
+  const value = await emailField.inputValue();
+  
+  // Assert the value
+  expect(value).toBe('user@example.com');
+});
+
+Example 2: Verify Button Text
+──────────────────────────────
+test('verify button text', async ({ page }) => {
+  const submitBtn = page.locator('button');
+  
+  // Get TEXT from button
+  const buttonText = await submitBtn.textContent();
+  
+  // Assert the text
+  expect(buttonText).toContain('Submit');
+});
+
+Example 3: Verify Error Message
+───────────────────────────────
+test('verify error message', async ({ page }) => {
+  const errorDiv = page.locator('#error-message');
+  
+  // Get TEXT content of error message
+  const errorText = await errorDiv.textContent();
+  
+  // Assert the error message
+  expect(errorText).toContain('This field is required');
+});
+
+Example 4: Verify Select Selection
+──────────────────────────────────
+test('verify select value', async ({ page }) => {
+  const select = page.locator('#country');
+  await select.selectOption('ca');
+  
+  // Get VALUE (not label)
+  const selectedValue = await select.inputValue();
+  
+  // Assert the value attribute
+  expect(selectedValue).toBe('ca');
+});
+
+Example 5: Get Textarea Content
+───────────────────────────────
+test('verify textarea content', async ({ page }) => {
+  const textarea = page.locator('#comments');
+  await textarea.fill('My feedback here');
+  
+  // Get VALUE from textarea
+  const content = await textarea.inputValue();
+  
+  // Assert the content
+  expect(content).toBe('My feedback here');
+});
+
+SUMMARY TABLE
+
+┌──────────────────┬────────────────────┬──────────────────────────┐
+│ Element          │ Method to Use      │ Returns Example          │
+├──────────────────┼────────────────────┼──────────────────────────┤
+│ <input text>     │ inputValue()       │ "user typed text"        │
+│ <input email>    │ inputValue()       │ "user@example.com"       │
+│ <input password> │ inputValue()       │ "secret123" (unmasked)   │
+│ <input number>   │ inputValue()       │ "42"                     │
+│ <input date>     │ inputValue()       │ "2025-01-15"             │
+│ <textarea>       │ inputValue()       │ "multi\nline\ntext"      │
+│ <select>         │ inputValue()       │ "selected_value"         │
+│ <button>         │ textContent()      │ "Click Me"               │
+│ <a> (link)       │ textContent()      │ "Sign In"                │
+│ <div>            │ textContent()      │ "Div content here"       │
+│ <span>           │ textContent()      │ "Span content"           │
+│ <p>              │ textContent()      │ "Paragraph text"         │
+│ <h1>             │ textContent()      │ "Heading Text"           │
+│ <label>          │ textContent()      │ "Field Label"            │
+└──────────────────┴────────────────────┴──────────────────────────┘
+
+================================================================================
+SECTION 2: TEXT INPUT ACTIONS
+================================================================================
+
+THE fill() METHOD
+
+Purpose: Fill text input fields with text
+Best for: Normal text entry (use this 90% of the time)
+Advantages: Simple, fast, event-complete
+
+Syntax:
+  await locator.fill(value, options?)
+
+Parameters:
+  • value (string): Text to fill into the field
+  • options.timeout: Maximum time to wait (default: 30000ms)
+  • options.noWaitAfter: Skip waiting for navigation (rare)
+  • options.force: Bypass actionability checks (not recommended)
+
+What fill() Does Internally:
+  1. Finds the element matching locator
+  2. Waits for actionability
+  3. Focuses the element
+  4. Clears existing text
+  5. Types the new text
+  6. Triggers input event
+  7. Waits for change handlers
+
+Example 1: Simple Text Input
+────────────────────────────
+import { test, expect } from '@playwright/test';
+
+test('fill text input', async ({ page }) => {
+  await page.goto('https://demowebshop.tricentis.com');
+  
+  // By role (most reliable)
+  await page.getByRole('textbox', { name: 'Search' }).fill('shoes');
+  
+  // By label
+  await page.getByLabel('Product Name').fill('Running Shoes');
+  
+  // By placeholder
+  await page.getByPlaceholder('Enter your name').fill('John Doe');
+  
+  // By test id
+  await page.getByTestId('search-input').fill('laptop');
+  
+  // Using locator selectors
+  await page.locator('#search-field').fill('tablet');
+  await page.locator('[name="username"]').fill('admin@example.com');
+});
+
+Example 2: Different Input Types
+──────────────────────────────────
+test('fill different input types', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Text input
+  await page.getByLabel('Full Name').fill('Alice Johnson');
+  
+  // Email input
+  await page.getByLabel('Email Address').fill('alice@example.com');
+  
+  // Password input
+  await page.getByLabel('Password').fill('SecurePassword123!');
+  
+  // Phone number
+  await page.getByLabel('Phone').fill('+1-234-567-8900');
+  
+  // Date input (ISO format: YYYY-MM-DD)
+  await page.getByLabel('Birth Date').fill('1990-05-15');
+  
+  // Time input (HH:mm format)
+  await page.getByLabel('Appointment Time').fill('14:30');
+  
+  // DateTime local (YYYY-MM-DDTHH:mm)
+  await page.getByLabel('Local DateTime').fill('2025-01-15T14:30');
+  
+  // Textarea
+  await page.getByLabel('Comments').fill('This is a multi-line\ncomment with line breaks');
+  
+  // Currency/Number
+  await page.getByLabel('Amount').fill('999.99');
+  
+  // URL
+  await page.getByLabel('Website').fill('https://example.com');
+});
+
+Example 3: ContentEditable Divs
+────────────────────────────────
+test('fill contenteditable elements', async ({ page }) => {
+  await page.goto('https://example.com/editor');
+  
+  // Fill works on contenteditable=true elements
+  const editor = page.locator('[contenteditable="true"]');
+  await editor.fill('This is rich text content');
+});
+
+Common Error Scenarios:
+──────────────────────
+
+Error: "element is not visible"
+Cause: Element is hidden, not in viewport, or display:none
+Fix: 
+  • Check CSS visibility properties
+  • Verify element is in DOM
+  • Scroll element into view first
+
+Error: "element is covered by another element"
+Cause: Modal, overlay, or another element on top
+Fix:
+  • Use { force: true } (not recommended)
+  • Close the covering element
+  • Wait for element to become visible
+
+Error: "timeout waiting for element to be stable"
+Cause: Animations or continuously moving element
+Fix:
+  • Increase timeout: await locator.fill(text, { timeout: 10000 })
+  • Wait for animation to finish
+  • Wait for element stability
+
+================================================================================
+SECTION 3: CHECKBOX & RADIO BUTTON ACTIONS
+================================================================================
+
+THE setChecked() / check() / uncheck() METHODS
+
+Purpose: Toggle checkboxes and radio buttons
+Syntax:
+  await locator.check()           // Check (radio/checkbox)
+  await locator.uncheck()         // Uncheck (checkbox only)
+  await locator.setChecked(true)  // Set checked state
+  await locator.setChecked(false) // Uncheck
+
+Supported Elements:
+  • <input type="checkbox">
+  • <input type="radio">
+  • Elements with [role="checkbox"]
+
+What check() Does:
+  1. Waits for actionability
+  2. Checks if already checked
+  3. If not checked, clicks to check
+  4. Waits for input/change events
+
+Example 1: Simple Checkbox
+────────────────────────────
+test('checkbox operations', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Check a checkbox
+  await page.getByLabel('I agree to terms').check();
+  
+  // Verify it's checked
+  await expect(page.getByLabel('I agree to terms')).toBeChecked();
+  
+  // Uncheck a checkbox
+  await page.getByLabel('Subscribe to newsletter').uncheck();
+  
+  // Verify it's unchecked
+  await expect(page.getByLabel('Subscribe to newsletter')).not.toBeChecked();
+  
+  // Using setChecked for dynamic control
+  await page.getByLabel('Remember me').setChecked(true);
+});
+
+Example 2: Multiple Checkboxes
+────────────────────────────────
+test('multiple checkboxes', async ({ page }) => {
+  await page.goto('https://example.com/preferences');
+  
+  // Check multiple items
+  await page.getByLabel('Email Notifications').check();
+  await page.getByLabel('SMS Notifications').check();
+  await page.getByLabel('Push Notifications').check();
+  
+  // Uncheck all
+  const preferences = page.locator('input[type="checkbox"]');
+  const count = await preferences.count();
+  for (let i = 0; i < count; i++) {
+    await preferences.nth(i).uncheck();
+  }
+  
+  // Check only specific ones by filter
+  const notificationCheckboxes = page.locator(
+    'input[type="checkbox"]:has-text("notification")'
+  );
+  await notificationCheckboxes.check();
+});
+
+Example 3: Radio Buttons
+──────────────────────────
+test('radio button operations', async ({ page }) => {
+  await page.goto('https://example.com/options');
+  
+  // Select a radio button option
+  await page.getByLabel('Small').check();
+  
+  // Verify selection
+  await expect(page.getByLabel('Small')).toBeChecked();
+  
+  // Switch selection (previous unchecks automatically)
+  await page.getByLabel('Large').check();
+  
+  // Verify new selection
+  await expect(page.getByLabel('Large')).toBeChecked();
+  await expect(page.getByLabel('Small')).not.toBeChecked();
+  
+  // Get selected value
+  const selected = await page.locator(
+    'input[type="radio"]:checked'
+  ).inputValue();
+  expect(selected).toBe('large');
+});
+
+Example 4: Role-based Checkboxes
+─────────────────────────────────
+test('checkbox with role attribute', async ({ page }) => {
+  await page.goto('https://example.com/accessible');
+  
+  // Checkboxes using role="checkbox"
+  await page.getByRole('checkbox', { name: 'Accept Terms' }).check();
+  
+  // Verify accessibility
+  await expect(
+    page.getByRole('checkbox', { name: 'Accept Terms' })
+  ).toBeChecked();
+});
+
+Assertion Methods for Checkboxes:
+
+// Check state
+await expect(checkbox).toBeChecked();
+await expect(checkbox).not.toBeChecked();
+
+// Visibility
+await expect(checkbox).toBeVisible();
+await expect(checkbox).toBeHidden();
+
+// Enable/Disable
+await expect(checkbox).toBeEnabled();
+await expect(checkbox).toBeDisabled();
+
+================================================================================
+SECTION 4: SELECT DROPDOWN ACTIONS
+================================================================================
+
+THE selectOption() METHOD
+
+Purpose: Select options from <select> dropdown menus
+Syntax:
+  await locator.selectOption(values, options?)
+
+Parameters:
+  • values: String | string[] | SelectOption | SelectOption[]
+  • SelectOption: { value?: string, label?: string, index?: number }
+
+Supported Elements:
+  • <select> elements
+  • <select multiple>
+
+Selection Methods:
+  1. By value: selectOption('red')
+  2. By label: selectOption({ label: 'Red Color' })
+  3. By index: selectOption({ index: 0 })
+  4. Multiple: selectOption(['red', 'green', 'blue'])
+
+Example 1: Single Selection
+────────────────────────────
+test('select single option', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Select by value
+  await page.getByLabel('Country').selectOption('US');
+  
+  // Select by label
+  await page.getByLabel('Color').selectOption({ label: 'Blue' });
+  
+  // Select by index (0-based)
+  await page.getByLabel('Priority').selectOption({ index: 1 });
+  
+  // Verify selection
+  await expect(page.locator('select')).toHaveValue('US');
+});
+
+Example 2: Multiple Selection - Basic Patterns
+────────────────────────────────────────────────
+test('select multiple options by value', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Select multiple colors (MUST have <select multiple> attribute)
+  await page.getByLabel('Choose Colors').selectOption([
+    'red',
+    'green',
+    'blue'
+  ]);
+  
+  // Verify selections using toHaveValues
+  await expect(page.getByLabel('Choose Colors')).toHaveValues([
+    'red',
+    'green',
+    'blue'
+  ]);
+});
+
+test('select multiple options by label', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Select by labels
+  await page.getByLabel('Interests').selectOption([
+    { label: 'Sports' },
+    { label: 'Music' },
+    { label: 'Reading' }
+  ]);
+  
+  // Verify using evaluate for more control
+  const selectedLabels = await page.getByLabel('Interests').evaluate(() => {
+    const selected = document.querySelectorAll('option:checked');
+    return Array.from(selected).map((option: any) => option.label);
+  });
+  expect(selectedLabels).toEqual(['Sports', 'Music', 'Reading']);
+});
+
+test('select multiple options by index', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Select first 3 options by index (0-based)
+  const multiSelect = page.locator('select[multiple]');
+  await multiSelect.selectOption([
+    { index: 0 },
+    { index: 1 },
+    { index: 2 }
+  ]);
+  
+  // Verify selections
+  const selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(selectedCount).toBe(3);
+});
+
+test('mixed selection methods', async ({ page }) => {
+  // Mix value, label, and index in same selectOption call
+  const multiSelect = page.locator('#colors');
+  
+  await multiSelect.selectOption([
+    'red',                          // by value
+    { label: 'Green' },             // by label
+    { index: 4 }                    // by index
+  ]);
+  
+  const selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(selectedCount).toBe(3);
+});
+
+Example 3: Advanced Multi-Select Operations
+────────────────────────────────────────────
+test('clear and reselect patterns', async ({ page }) => {
+  const multiSelect = page.getByLabel('Select Items');
+  
+  // Select initial items
+  await multiSelect.selectOption(['item1', 'item2', 'item3']);
+  await expect(multiSelect).toHaveValues(['item1', 'item2', 'item3']);
+  
+  // Clear all selections by passing empty array
+  await multiSelect.selectOption([]);
+  
+  // Verify all cleared
+  const remaining = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(remaining).toBe(0);
+  
+  // Re-select new items
+  await multiSelect.selectOption(['item2', 'item4']);
+  await expect(multiSelect).toHaveValues(['item2', 'item4']);
+});
+
+test('select all available options', async ({ page }) => {
+  const multiSelect = page.locator('#colors');
+  
+  // Get all option values
+  const allOptions = await multiSelect.locator('option').evaluate(
+    elements => elements.map((el: any) => el.value)
+  );
+  
+  console.log('All available options:', allOptions);
+  
+  // Select all
+  await multiSelect.selectOption(allOptions);
+  
+  // Verify all selected
+  const selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(selectedCount).toBe(allOptions.length);
+});
+
+test('get all option information', async ({ page }) => {
+  const multiSelect = page.locator('#colors');
+  
+  // Get count of all options
+  const optionsCount = await multiSelect.locator('option').count();
+  console.log(`Total options: ${optionsCount}`);
+  
+  // Get all option texts
+  const allOptionTexts = await multiSelect.locator('option')
+    .allTextContents();
+  console.log('Option labels:', allOptionTexts);
+  
+  // Get all option values
+  const allOptionValues = await multiSelect.locator('option').evaluate(
+    elements => elements.map((el: any) => el.value)
+  );
+  console.log('Option values:', allOptionValues);
+  
+  // Iterate and log each option
+  for (let i = 0; i < optionsCount; i++) {
+    const label = await multiSelect.locator('option').nth(i).innerText();
+    const value = await multiSelect.locator('option').nth(i)
+      .getAttribute('value');
+    console.log(`Option ${i + 1}: Label=${label}, Value=${value}`);
+  }
+});
+
+test('count selected options at different stages', async ({ page }) => {
+  const multiSelect = page.getByLabel('Colors');
+  
+  // Stage 1: Select initial options
+  await multiSelect.selectOption(['blue', 'yellow']);
+  let selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  console.log(`Count after first selection: ${selectedCount}`);
+  expect(selectedCount).toBe(2);
+  
+  // Stage 2: Add more options
+  await multiSelect.selectOption(['red', 'green', 'blue', 'yellow']);
+  selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  console.log(`Count after adding more: ${selectedCount}`);
+  expect(selectedCount).toBe(4);
+  
+  // Stage 3: Partial selection
+  await multiSelect.selectOption(['red', 'blue']);
+  selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  console.log(`Count after partial reselection: ${selectedCount}`);
+  expect(selectedCount).toBe(2);
+});
+
+Example 4: Dynamic Multi-Select with API-Loaded Options
+───────────────────────────────────────────────────────
+test('multi-select with dynamically loaded options', async ({ page }) => {
+  const multiSelect = page.getByLabel('Dynamic Options');
+  
+  // Wait for options to load
+  await page.waitForFunction(() => {
+    const options = document.querySelectorAll('#dynamic option');
+    return options.length > 3; // Wait for at least 4 options
+  });
+  
+  // Get available options
+  const availableOptions = await multiSelect.locator('option')
+    .allTextContents();
+  console.log('Available:', availableOptions);
+  
+  // Safely select only existing options
+  const toSelect = availableOptions.slice(0, 3); // First 3
+  if (toSelect.length > 0) {
+    await multiSelect.selectOption(
+      toSelect.map(label => ({ label }))
+    );
+  }
+  
+  // Verify
+  await expect(multiSelect).toHaveValues(
+    await multiSelect.evaluate(() => 
+      Array.from(document.querySelectorAll('option:checked'))
+        .map((opt: any) => opt.value)
+    )
+  );
+});
+
+Example 5: Multi-Select Assertions and Verification
+────────────────────────────────────────────────────
+test('comprehensive multi-select assertions', async ({ page }) => {
+  const multiSelect = page.locator('select[multiple]');
+  
+  // Setup: Select multiple values
+  await multiSelect.selectOption(['red', 'green', 'blue']);
+  
+  // ASSERTION 1: Check exact values
+  await expect(multiSelect).toHaveValues(['red', 'green', 'blue']);
+  
+  // ASSERTION 2: Check count of selected
+  const selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(selectedCount).toBe(3);
+  
+  // ASSERTION 3: Check specific values exist
+  const selectedValues = await multiSelect.evaluate(() =>
+    Array.from(document.querySelectorAll('option:checked'))
+      .map((opt: any) => opt.value)
+  );
+  expect(selectedValues).toContain('red');
+  expect(selectedValues).toContain('green');
+  expect(selectedValues).not.toContain('yellow');
+  
+  // ASSERTION 4: Check attribute existence
+  const hasMultiple = await multiSelect.getAttribute('multiple');
+  expect(hasMultiple).not.toBeNull();
+  
+  // ASSERTION 5: Verify option elements exist
+  const allOptions = await multiSelect.locator('option').count();
+  expect(allOptions).toBeGreaterThan(3);
+});
+
+Example 3: Complex Select Scenarios
+─────────────────────────────────────
+test('complex select operations', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Dynamic select - get all options first
+  const select = page.getByLabel('Dynamic Category');
+  const options = await select.locator('option').allTextContents();
+  console.log('Available options:', options);
+  
+  // Select based on availability
+  if (options.includes('Electronics')) {
+    await select.selectOption('Electronics');
+  }
+  
+  // Cascade selects (dependent dropdowns)
+  // When country changes, city options update
+  await page.getByLabel('Country').selectOption('USA');
+  await page.waitForTimeout(500); // Wait for cascade
+  await page.getByLabel('State').selectOption('California');
+  await page.waitForTimeout(500);
+  await page.getByLabel('City').selectOption('Los Angeles');
+});
+
+Example 4: Assertions
+──────────────────────
+test('select assertions', async ({ page }) => {
+  const select = page.getByLabel('Category');
+  
+  // Value assertion
+  await expect(select).toHaveValue('electronics');
+  
+  // Multiple values
+  const multiSelect = page.locator('select[multiple]');
+  await expect(multiSelect).toHaveValues(['red', 'green']);
+  
+  // Check if option exists
+  const hasOption = await select.locator(
+    'option:has-text("Premium")'
+  ).count() > 0;
+  expect(hasOption).toBe(true);
+});
+
+MULTI-SELECT BEST PRACTICES
+─────────────────────────────
+1. ALWAYS check for 'multiple' attribute before selecting multiple values
+2. ALWAYS wait for dynamically loaded options before selecting
+3. USE evaluate() for complex verification instead of just toHaveValues()
+4. USE allTextContents() to verify available options before selection
+5. HANDLE empty selections with selectOption([]) to clear everything
+6. VERIFY selection count with evaluate() for edge case testing
+7. DESELECT individual items by passing all-except-that-item array
+
+COMMON ERRORS
+──────────────
+Error: "Cannot select multiple on non-multiple select"
+Cause: selectOption(['val1', 'val2']) on <select> without multiple attribute
+Fix: Verify HTML has <select multiple> or only select one value
+
+Error: "locator did not resolve to any elements"
+Cause: Select element not in DOM when selection attempted
+Fix: Add explicit wait or waitForSelector before selectOption()
+
+Error: Verification fails with toHaveValues()
+Cause: Order mismatch or unexpected values selected
+Fix: Use evaluate() to get actual values and inspect them
+
+Issue: "Multi-select shows only non-selected options after first action"
+Cause: CTRL+Click behavior not simulated by selectOption()
+Fix: selectOption() handles multiple correctly - verify HTML structure
+
+================================================================================
+SECTION 5: MOUSE CLICK ACTIONS
+================================================================================
+
+THE click() METHOD
+
+Purpose: Simulate mouse clicks on elements
+Syntax:
+  await locator.click(options?)
+
+Click Types:
+  1. Single click (left button)
+  2. Double click (dblclick)
+  3. Right click (context menu)
+  4. Modifier clicks (Shift, Ctrl, Alt, Meta)
+  5. Positioned clicks (specific coordinates)
+  6. Forced clicks (bypass actionability)
+
+Example 1: Basic Clicks
+────────────────────────
+test('basic click operations', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Simple click
+  await page.getByRole('button', { name: 'Login' }).click();
+  
+  // Click by text
+  await page.getByText('Sign Up').click();
+  
+  // Click by role
+  await page.getByRole('link', { name: 'About' }).click();
+  
+  // Click by test id
+  await page.getByTestId('submit-button').click();
+  
+  // Click with CSS selector
+  await page.locator('.submit-btn').click();
+  
+  // Click with XPath
+  await page.locator('//button[contains(text(), "Submit")]').click();
+});
+
+Example 2: Double Click
+────────────────────────
+test('double click operations', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Double click to select/edit
+  await page.getByText('Item').dblclick();
+  
+  // Verify selection (select event fired)
+  const selectedText = await page.evaluate(() => {
+    return window.getSelection().toString();
+  });
+  expect(selectedText).toBeTruthy();
+  
+  // Double click with delay
+  await page.locator('#editable').dblclick({ delay: 100 });
+});
+
+Example 3: Right Click (Context Menu)
+──────────────────────────────────────
+test('right click operations', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Right click for context menu
+  await page.getByText('Item').click({ button: 'right' });
+  
+  // Verify context menu appears
+  const contextMenu = page.locator('[role="menu"]');
+  await expect(contextMenu).toBeVisible();
+  
+  // Click context menu option
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
+});
+
+Example 4: Modifier Keys
+──────────────────────────
+test('click with modifiers', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Shift + Click
+  await page.getByText('Item').click({ modifiers: ['Shift'] });
+  
+  // Ctrl/Cmd + Click (open in new tab)
+  await page.getByRole('link').click({ modifiers: ['ControlOrMeta'] });
+  
+  // Alt + Click
+  await page.getByText('Download').click({ modifiers: ['Alt'] });
+  
+  // Multiple modifiers
+  await page.getByText('Item').click({
+    modifiers: ['Control', 'Shift']
+  });
+});
+
+Example 5: Positioned Clicks
+──────────────────────────────
+test('click at specific position', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Click at top-left corner
+  await page.getByRole('button').click({
+    position: { x: 0, y: 0 }
+  });
+  
+  // Click at center (default)
+  await page.getByRole('button').click({
+    position: { x: 50, y: 25 }
+  });
+  
+  // Click with offset from element
+  await page.locator('#canvas').click({
+    position: { x: 100, y: 100 }
+  });
+});
+
+Example 6: Forced Click
+─────────────────────────
+test('forced click bypass actionability', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Click hidden element (use cautiously!)
+  await page.getByRole('button').click({ force: true });
+  
+  // Note: force: true:
+  // ✗ Bypasses visibility checks
+  // ✗ Bypasses coverage checks
+  // ✗ Doesn't simulate real user behavior
+  // ✗ Tests implementation, not user experience
+  // Use only when you know element will be visible soon
+});
+
+Example 7: Programmatic Click
+───────────────────────────────
+test('dispatch click event', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Dispatch JavaScript click event (not real click)
+  await page.getByRole('button').dispatchEvent('click');
+  
+  // Differences from real click:
+  // • Doesn't wait for actionability
+  // • Doesn't scroll element
+  // • Triggers click event, not pointer events
+  // • Suitable for testing click handlers
+  // • Not suitable for testing real interactions
+});
+
+Click Options:
+
+{
+  button: 'left' | 'right' | 'middle'  // Default: 'left'
+  clickCount: number                     // Default: 1
+  delay: number                          // ms between mousedown & mouseup
+  modifiers: 'Alt' | 'Control' | 'Meta' | 'Shift'[]
+  position: { x: number, y: number }    // Relative to element
+  force: boolean                         // Bypass checks
+  noWaitAfter: boolean                   // Skip navigation wait
+  timeout: number                        // ms to wait
+}
+
+================================================================================
+SECTION 6: KEYBOARD ACTIONS
+================================================================================
+
+KEYBOARD METHODS
+
+Three approaches to keyboard input:
+
+1. pressSequentially()  - Type character by character (realistic)
+2. press()             - Press single key or shortcut (fast)
+3. type()              - Deprecated, use pressSequentially
+
+Example 1: pressSequentially() - Type Characters
+─────────────────────────────────────────────────
+test('type characters sequentially', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Type text character by character
+  await page.getByLabel('Search').pressSequentially('Hello World');
+  
+  // Type with delay between characters (simulate slower typing)
+  await page.getByLabel('Password').pressSequentially('SecurePass123', {
+    delay: 100 // 100ms between each character
+  });
+  
+  // Use when:
+  // ✓ Testing special keyboard handlers
+  // ✓ Need event sequence verification
+  // ✓ Testing character-by-character input validation
+  // Note: Much slower than fill()
+});
+
+Example 2: press() - Single Keys & Shortcuts
+──────────────────────────────────────────────
+test('press keys and shortcuts', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Single keys
+  await page.getByRole('textbox').focus();
+  await page.press('Enter');           // Submit form
+  await page.press('Escape');          // Close modal
+  await page.press('Tab');             // Move to next field
+  await page.press('ArrowDown');       // Navigate menu
+  
+  // Special keys
+  await page.press('Backspace');
+  await page.press('Delete');
+  await page.press('Home');
+  await page.press('End');
+  await page.press('PageUp');
+  await page.press('PageDown');
+  
+  // Function keys
+  await page.press('F1');
+  await page.press('F12');
+  
+  // Key combinations
+  await page.press('Control+A');       // Select all (Windows/Linux)
+  await page.press('Meta+A');          // Select all (macOS)
+  await page.press('Control+C');       // Copy
+  await page.press('Control+V');       // Paste
+  await page.press('Control+Z');       // Undo
+  await page.press('Shift+Tab');       // Shift+Tab for reverse
+  await page.press('Control+Shift+P'); // Multi-modifier
+  
+  // Case-sensitive
+  await page.press('Shift+A');         // Capital A
+  await page.press('Shift+2');         // @ symbol
+});
+
+Example 3: Keyboard Navigation
+────────────────────────────────
+test('keyboard navigation', async ({ page }) => {
+  await page.goto('https://example.com/menu');
+  
+  // Navigate dropdown with arrow keys
+  const select = page.getByLabel('Category');
+  await select.focus();
+  await page.press('ArrowDown');  // Next option
+  await page.press('ArrowDown');
+  await page.press('Enter');      // Select
+  
+  // Navigate form fields with Tab
+  const firstField = page.getByLabel('First Name');
+  await firstField.focus();
+  await page.press('Tab');        // Move to next field
+  await page.press('Tab');        // Move to next field
+  await page.press('Shift+Tab');  // Go back
+  
+  // Search with Ctrl+F
+  await page.press('Control+F');
+  await page.keyboard.type('search term');
+});
+
+Example 4: Special Character Input
+────────────────────────────────────
+test('special characters', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Using press() for symbols
+  const textbox = page.getByRole('textbox');
+  await textbox.focus();
+  
+  await page.press('$');           // $
+  await page.press('!');           // !
+  await page.press('Shift+2');     // @
+  await page.press('Shift+3');     // #
+  await page.press('Shift+4');     // $
+  
+  // Or use pressSequentially
+  await textbox.pressSequentially('Hello@123!$');
+});
+
+Example 5: Supported Key Names
+────────────────────────────────
+// Digit keys
+Digit0 - Digit9
+
+// Letter keys (use shift for uppercase)
+KeyA - KeyZ
+
+// Special keys
+Backquote, Minus, Equal, Backslash
+Backspace, Tab, Delete, Escape
+Enter, Home, End, PageUp, PageDown
+ArrowLeft, ArrowRight, ArrowUp, ArrowDown
+Insert, F1-F12
+
+// Modifiers (can combine)
+Shift, Control, Alt, Meta
+
+// Examples:
+await page.press('Digit0');        // 0
+await page.press('KeyA');          // a
+await page.press('Shift+KeyA');    // A
+await page.press('Control+Enter'); // Ctrl+Enter
+await page.press('Meta+Shift+L');  // Cmd+Shift+L (macOS)
+
+Example 6: Form Submission Patterns
+─────────────────────────────────────
+test('submit form with keyboard', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Fill and submit with Enter
+  await page.getByLabel('Username').fill('testuser');
+  await page.getByLabel('Password').fill('password123');
+  
+  // Submit with Enter key
+  await page.getByLabel('Password').press('Enter');
+  
+  // Or Tab to button and Enter
+  await page.getByLabel('Password').press('Tab');
+  await page.press('Enter');
+});
+
+Key Codes Reference:
+
+DIRECTIONAL KEYS:
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight
+  Home, End, PageUp, PageDown
+
+EDITING KEYS:
+  Backspace, Delete, Insert
+
+CONTROL KEYS:
+  Tab, Enter, Escape
+
+FUNCTION KEYS:
+  F1, F2, ... F12
+
+MODIFIERS:
+  Shift, Control, Alt, Meta
+
+CHARACTER INPUT:
+  Any single character: '!', '@', '#', '$', etc.
+  Or use Digit0-9, KeyA-Z with Shift modifier
+
+================================================================================
+SECTION 7: FILE UPLOAD ACTIONS
+================================================================================
+
+THE setInputFiles() METHOD
+
+Purpose: Upload files through file input elements
+Syntax:
+  await locator.setInputFiles(files, options?)
+
+File Input Methods:
+  1. Path string: setInputFiles('path/to/file.pdf')
+  2. Multiple files: setInputFiles(['file1.txt', 'file2.pdf'])
+  3. Buffer upload: setInputFiles({ name, mimeType, buffer })
+  4. Directory: setInputFiles('path/to/directory')
+  5. Clear files: setInputFiles([])
+
+Example 1: Single File Upload
+──────────────────────────────
+test('upload single file', async ({ page }) => {
+  const path = require('path');
+  await page.goto('https://example.com/upload');
+  
+  // Upload single file
+  const filePath = path.join(__dirname, 'documents', 'resume.pdf');
+  await page.getByLabel('Upload Resume').setInputFiles(filePath);
+  
+  // Verify file was set
+  const inputValue = await page.locator('input[type="file"]').inputValue();
+  expect(inputValue).toBeTruthy();
+});
+
+Example 2: Multiple Files Upload
+──────────────────────────────────
+test('upload multiple files', async ({ page }) => {
+  const path = require('path');
+  await page.goto('https://example.com/upload');
+  
+  // Upload multiple files
+  const files = [
+    path.join(__dirname, 'files', 'document1.pdf'),
+    path.join(__dirname, 'files', 'document2.docx'),
+    path.join(__dirname, 'files', 'image.jpg')
+  ];
+  
+  await page.getByLabel('Upload Files').setInputFiles(files);
+  
+  // Verify all files were added
+  const fileCount = await page.locator(
+    'input[type="file"]'
+  ).evaluate((input: any) => input.files.length);
+  expect(fileCount).toBe(3);
+});
+
+Example 3: Upload from Buffer (Dynamic Content)
+─────────────────────────────────────────────────
+test('upload file from memory', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  // Create file content in memory
+  const fileContent = Buffer.from('This is test file content');
+  
+  await page.getByLabel('Upload File').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: fileContent
+  });
+});
+
+Example 4: Multiple Buffer Files
+──────────────────────────────────
+test('upload multiple buffer files', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  const files = [
+    {
+      name: 'file1.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Content of file 1')
+    },
+    {
+      name: 'file2.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Content of file 2')
+    }
+  ];
+  
+  await page.getByLabel('Upload Files').setInputFiles(files);
+});
+
+Example 5: Upload Directory
+─────────────────────────────
+test('upload directory', async ({ page }) => {
+  const path = require('path');
+  await page.goto('https://example.com/upload');
+  
+  // Upload entire directory
+  const dirPath = path.join(__dirname, 'documents');
+  await page.getByLabel('Upload Folder').setInputFiles(dirPath);
+});
+
+Example 6: Clear Selected Files
+─────────────────────────────────
+test('clear file selection', async ({ page }) => {
+  const path = require('path');
+  await page.goto('https://example.com/upload');
+  
+  // Upload file
+  await page.getByLabel('Upload File').setInputFiles(
+    path.join(__dirname, 'test.pdf')
+  );
+  
+  // Later, clear the selection
+  await page.getByLabel('Upload File').setInputFiles([]);
+  
+  // Verify cleared
+  const fileCount = await page.locator(
+    'input[type="file"]'
+  ).evaluate((input: any) => input.files.length);
+  expect(fileCount).toBe(0);
+});
+
+Example 7: File Chooser Event
+──────────────────────────────
+test('handle file chooser dialog', async ({ page }) => {
+  const path = require('path');
+  await page.goto('https://example.com/upload');
+  
+  // Start listening for file chooser before click
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  
+  // Trigger the file chooser
+  await page.getByText('Upload Document').click();
+  
+  // Get the file chooser and set files
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(
+    path.join(__dirname, 'documents', 'report.pdf')
+  );
+  
+  // Wait for upload to complete
+  await page.waitForNavigation();
+});
+
+Example 8: File Validation
+────────────────────────────
+test('verify uploaded file', async ({ page }) => {
+  const path = require('path');
+  const fs = require('fs');
+  
+  await page.goto('https://example.com/upload');
+  
+  const testFile = path.join(__dirname, 'test.txt');
+  
+  // Verify file exists before upload
+  expect(fs.existsSync(testFile)).toBe(true);
+  
+  // Upload
+  await page.getByLabel('Upload').setInputFiles(testFile);
+  
+  // Verify in UI
+  await expect(page.getByText('test.txt')).toBeVisible();
+  await expect(page.getByText('Upload successful')).toBeVisible();
+});
+
+Common MIME Types:
+
+Text:
+  text/plain
+  text/csv
+  text/xml
+
+Documents:
+  application/pdf
+  application/msword
+  application/vnd.openxmlformats-officedocument.wordprocessingml.document
+  application/vnd.ms-excel
+  application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+Images:
+  image/jpeg
+  image/png
+  image/gif
+  image/webp
+
+Video:
+  video/mp4
+  video/mpeg
+  video/webm
+
+Audio:
+  audio/mpeg
+  audio/wav
+  audio/ogg
+
+================================================================================
+SECTION 8: FOCUS ELEMENT ACTIONS
+================================================================================
+
+THE focus() METHOD
+
+Purpose: Set keyboard focus to an element
+Syntax:
+  await locator.focus(options?)
+
+When to use focus():
+  • Test focus event handlers
+  • Prepare element for keyboard input
+  • Test focus-specific styling
+  • Verify tab order
+  • Test accessibility features
+
+Example 1: Basic Focus
+───────────────────────
+test('focus element', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Focus on element
+  await page.getByLabel('Email').focus();
+  
+  // Verify focus (activeElement)
+  const focused = await page.evaluate(() => {
+    return document.activeElement?.id;
+  });
+  expect(focused).toBe('email-input');
+});
+
+Example 2: Focus Events
+────────────────────────
+test('focus event handling', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Listen for focus event
+  let focusCount = 0;
+  await page.getByLabel('Username').evaluate((el: any) => {
+    el.addEventListener('focus', () => {
+      focusCount++;
+    });
+  });
+  
+  // Focus triggers event
+  await page.getByLabel('Username').focus();
+  
+  // Note: Need to verify via UI effect, not direct count
+});
+
+Example 3: Focus Order (Tab Navigation)
+─────────────────────────────────────────
+test('verify focus order', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  const firstField = page.getByLabel('First Name');
+  const secondField = page.getByLabel('Last Name');
+  const submitBtn = page.getByRole('button', { name: 'Submit' });
+  
+  // Start at first field
+  await firstField.focus();
+  let focused = await page.evaluate(() => document.activeElement?.id);
+  expect(focused).toBe('first-name');
+  
+  // Tab to next
+  await page.press('Tab');
+  focused = await page.evaluate(() => document.activeElement?.id);
+  expect(focused).toBe('last-name');
+  
+  // Tab to button
+  await page.press('Tab');
+  focused = await page.evaluate(() => document.activeElement?.id);
+  expect(focused).toBe('submit-btn');
+});
+
+Example 4: Focus with Styling Changes
+───────────────────────────────────────
+test('focus styling', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  const input = page.getByLabel('Username');
+  
+  // Before focus
+  await expect(input).not.toHaveClass('focused');
+  
+  // Focus
+  await input.focus();
+  
+  // After focus (if CSS applies focused class)
+  await expect(input).toHaveClass('focused');
+  
+  // Or check border color
+  const borderColor = await input.evaluate((el: any) => {
+    return window.getComputedStyle(el).borderColor;
+  });
+  expect(borderColor).toBe('rgb(0, 122, 204)'); // Focused color
+});
+
+Example 5: Focus for Password Fields
+──────────────────────────────────────
+test('focus password field', async ({ page }) => {
+  await page.goto('https://example.com/login');
+  
+  // Focus password field
+  const password = page.getByLabel('Password');
+  await password.focus();
+  
+  // Type password (focus required for some input masks)
+  await page.press('Shift+A');
+  await page.press('Digit1');
+  await page.press('$');
+  
+  // Verify password is masked
+  const value = await password.inputValue();
+  expect(value).toBe('aA1$');
+});
+
+Focus-related Assertions:
+
+// Check if element is focused
+const isFocused = await page.evaluate((selector) => {
+  return document.activeElement?.id === 'target-id';
+}, locator);
+
+// Check outline/border on focus
+const hasOutline = await input.evaluate((el: any) => {
+  const style = window.getComputedStyle(el);
+  return style.outlineWidth !== '0px' || style.borderWidth !== '1px';
+});
+
+// Check focus-visible (accessibility)
+const focusVisible = await input.evaluate((el: any) => {
+  return el.matches(':focus-visible');
+});
+
+================================================================================
+SECTION 9: DRAG AND DROP ACTIONS
+================================================================================
+
+DRAG & DROP METHODS
+
+Three approaches:
+
+1. dragTo()        - Simple drag to another element
+2. Manual drag     - hover() + mouse.down() + hover() + mouse.up()
+3. dropEvent()     - Programmatic drop (not recommended)
+
+Example 1: Simple dragTo()
+────────────────────────────
+test('simple drag and drop', async ({ page }) => {
+  await page.goto('https://example.com/dnd');
+  
+  // Drag item to target
+  const draggable = page.locator('#item-to-drag');
+  const dropTarget = page.locator('#drop-zone');
+  
+  await draggable.dragTo(dropTarget);
+  
+  // Verify item moved
+  await expect(dropTarget).toContainText('item-to-drag');
+});
+
+Example 2: Drag with Delay
+─────────────────────────────
+test('drag with delay', async ({ page }) => {
+  await page.goto('https://example.com/dnd');
+  
+  // Drag with delay (some apps need time to register drag)
+  await page.locator('.draggable').dragTo(
+    page.locator('.drop-zone'),
+    { delay: 500 } // 500ms between mousedown and mouseup
+  );
+});
+
+Example 3: Manual Drag (Precise Control)
+──────────────────────────────────────────
+test('manual drag with multiple hovers', async ({ page }) => {
+  await page.goto('https://example.com/dnd');
+  
+  // For apps that need dragover event multiple times
+  const source = page.locator('#item-to-drag');
+  const target = page.locator('#drop-zone');
+  
+  // Manual drag sequence
+  await source.hover();           // Hover source
+  await page.mouse.down();        // Press mouse
+  await target.hover();           // Move to target
+  await target.hover();           // Move again (important!)
+  await page.mouse.up();          // Release mouse
+});
+
+Example 4: Drag Multiple Items
+────────────────────────────────
+test('drag multiple items', async ({ page }) => {
+  await page.goto('https://example.com/dnd');
+  
+  const items = page.locator('.draggable');
+  const dropZone = page.locator('.drop-zone');
+  
+  // Drag all items one by one
+  const count = await items.count();
+  for (let i = 0; i < count; i++) {
+    await items.nth(i).dragTo(dropZone);
+    await page.waitForTimeout(200);
+  }
+  
+  // Verify all dragged
+  await expect(dropZone).toContainText('4 items');
+});
+
+Example 5: Drag to Specific Position
+──────────────────────────────────────
+test('drag to coordinates', async ({ page }) => {
+  await page.goto('https://example.com/dnd');
+  
+  const item = page.locator('.draggable');
+  
+  // Manual drag to specific coordinate
+  await item.hover();
+  await page.mouse.down();
+  await page.mouse.move(500, 300);  // Absolute coordinates
+  await page.mouse.up();
+});
+
+Example 6: File Drop
+─────────────────────
+test('file drop zone', async ({ page }) => {
+  const path = require('path');
+  await page.goto('https://example.com/upload');
+  
+  const filePath = path.join(__dirname, 'test.pdf');
+  
+  // Method 1: Use setInputFiles (simpler)
+  await page.locator('[data-testid="drop-zone"]')
+    .locator('input[type="file"]')
+    .setInputFiles(filePath);
+  
+  // Method 2: Drag file to drop zone (rare, requires special setup)
+  // Note: Browser security prevents actual file drag from system
+});
+
+Example 7: Reorder List Items
+───────────────────────────────
+test('reorder list with drag', async ({ page }) => {
+  await page.goto('https://example.com/list');
+  
+  const items = page.locator('.list-item');
+  
+  // Get initial order
+  const initialTexts = await items.allTextContents();
+  console.log('Initial:', initialTexts);
+  
+  // Drag first item to bottom
+  const firstItem = items.first();
+  const lastItem = items.last();
+  
+  await firstItem.dragTo(lastItem);
+  
+  // Get new order
+  const newTexts = await items.allTextContents();
+  console.log('After drag:', newTexts);
+  
+  // Verify changed
+  expect(newTexts).not.toEqual(initialTexts);
+});
+
+Mouse Methods for Advanced Drag:
+
+mouse.down()   - Press left mouse button
+mouse.up()     - Release mouse button
+mouse.move()   - Move cursor to coordinates
+mouse.wheel()  - Scroll with mouse wheel
+mouse.click()  - Simple click
+mouse.dblclick() - Double click
+
+Example:
+await page.mouse.down();
+await page.mouse.move(500, 300);
+await page.mouse.move(500, 400); // Move again
+await page.mouse.up();
+
+================================================================================
+SECTION 10: SCROLLING ACTIONS
+================================================================================
+
+SCROLLING METHODS
+
+Playwright auto-scrolls for most actions, but sometimes you need manual control.
+
+Methods:
+  1. scrollIntoViewIfNeeded()   - Scroll element into view
+  2. mouse.wheel()             - Scroll with wheel
+  3. page.evaluate()           - Programmatic scroll
+  4. page.keyboard.press()     - Keyboard scroll
+
+Example 1: Auto-scroll (Default Behavior)
+──────────────────────────────────────────
+test('auto scroll on click', async ({ page }) => {
+  await page.goto('https://example.com/long-page');
+  
+  // Playwright automatically scrolls before action
+  // No need to do anything special
+  await page.getByText('Footer Button').click();
+  
+  // The button is automatically scrolled into view
+  // Then clicked
+});
+
+Example 2: scrollIntoViewIfNeeded()
+────────────────────────────────────
+test('scroll element into view', async ({ page }) => {
+  await page.goto('https://example.com/long-page');
+  
+  // Explicitly scroll element into view
+  const footer = page.getByText('Footer Content');
+  await footer.scrollIntoViewIfNeeded();
+  
+  // Now perform action
+  await footer.click();
+  
+  // Use when:
+  // • Testing scroll behavior separately
+  // • Infinite lists need scrolling to load more
+  // • Need element visible before taking screenshot
+});
+
+Example 3: Mouse Wheel Scroll
+───────────────────────────────
+test('scroll with mouse wheel', async ({ page }) => {
+  await page.goto('https://example.com/page');
+  
+  // Scroll down
+  await page.mouse.wheel(0, 10);     // y: positive = down
+  
+  // Scroll up
+  await page.mouse.wheel(0, -10);    // y: negative = up
+  
+  // Horizontal scroll
+  await page.mouse.wheel(10, 0);     // x: positive = right
+  
+  // Multiple scrolls
+  for (let i = 0; i < 5; i++) {
+    await page.mouse.wheel(0, 5);    // Scroll down gradually
+  }
+});
+
+Example 4: Programmatic Scroll
+────────────────────────────────
+test('programmatic scroll', async ({ page }) => {
+  await page.goto('https://example.com/page');
+  
+  // Scroll entire page
+  await page.evaluate(() => {
+    window.scrollBy(0, 500);  // Scroll down 500px
+  });
+  
+  // Scroll specific element
+  await page.locator('[data-testid="scrollable-div"]').evaluate(el => {
+    el.scrollTop += 300;
+  });
+  
+  // Scroll to top
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
+  
+  // Scroll to bottom
+  await page.evaluate(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+  });
+});
+
+Example 5: Keyboard Scroll
+─────────────────────────────
+test('scroll with keyboard', async ({ page }) => {
+  await page.goto('https://example.com/page');
+  
+  // Focus on page/element first
+  await page.getByRole('main').focus();
+  
+  // Use keyboard to scroll
+  await page.press('PageDown');      // Scroll one page down
+  await page.press('PageUp');        // Scroll one page up
+  await page.press('Home');          // Scroll to top
+  await page.press('End');           // Scroll to bottom
+  
+  // Arrow keys (smaller increment)
+  await page.press('ArrowDown');
+  await page.press('ArrowUp');
+});
+
+Example 6: Infinite List Loading
+──────────────────────────────────
+test('infinite list scroll load', async ({ page }) => {
+  await page.goto('https://example.com/infinite-list');
+  
+  // Get initial count
+  let items = page.locator('.list-item');
+  let initialCount = await items.count();
+  console.log('Initial items:', initialCount);
+  
+  // Scroll to bottom to trigger load
+  const footer = page.getByText('Loading more...');
+  await footer.scrollIntoViewIfNeeded();
+  
+  // Wait for new items
+  await page.waitForFunction(async () => {
+    const currentCount = await page.locator('.list-item').count();
+    return currentCount > initialCount;
+  });
+  
+  // Get new count
+  const newCount = await page.locator('.list-item').count();
+  console.log('After scroll:', newCount);
+  expect(newCount).toBeGreaterThan(initialCount);
+});
+
+Example 7: Get Scroll Position
+───────────────────────────────
+test('check scroll position', async ({ page }) => {
+  await page.goto('https://example.com/page');
+  
+  // Get current scroll position
+  const scrollPos = await page.evaluate(() => {
+    return {
+      x: window.scrollX,
+      y: window.scrollY,
+      height: document.documentElement.scrollHeight,
+      viewportHeight: window.innerHeight
+    };
+  });
+  
+  console.log('Scroll position:', scrollPos);
+  
+  // Check if at bottom
+  const isAtBottom = scrollPos.y + scrollPos.viewportHeight 
+    >= scrollPos.height;
+  console.log('At bottom:', isAtBottom);
+});
+
+Example 8: Scroll Within Container
+────────────────────────────────────
+test('scroll inside container', async ({ page }) => {
+  await page.goto('https://example.com/page');
+  
+  const container = page.locator('[data-testid="scrollable-container"]');
+  
+  // Scroll within container
+  await container.evaluate(el => {
+    el.scrollTop += 200;
+  });
+  
+  // Get container scroll position
+  const scrollInfo = await container.evaluate(el => {
+    return {
+      scrollTop: el.scrollTop,
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight
+    };
+  });
+  
+  console.log('Container scroll:', scrollInfo);
+});
+
+Scroll Utilities:
+
+// Scroll horizontally
+await page.evaluate(() => window.scrollBy(100, 0));
+
+// Smooth scroll (CSS)
+await page.evaluate(() => {
+  window.scrollTo({ top: 500, behavior: 'smooth' });
+});
+
+// Check if scrollable
+const isScrollable = await container.evaluate(el => {
+  return el.scrollHeight > el.clientHeight;
+});
+
+================================================================================
+SECTION 11: ADVANCED ACTION PATTERNS
+================================================================================
+
+Pattern 1: Action with Event Verification
+────────────────────────────────────────────
+test('verify input event fired', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Listen for input event
+  let eventFired = false;
+  await page.getByLabel('Username').evaluate((el: any) => {
+    el.addEventListener('input', () => {
+      eventFired = true;
+    });
+  });
+  
+  // Fill triggers input event
+  await page.getByLabel('Username').fill('testuser');
+  
+  // Verify via UI change (not direct variable)
+  await expect(page.getByLabel('Username')).toHaveValue('testuser');
+});
+
+Pattern 2: Conditional Actions
+─────────────────────────────────
+test('conditional click', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Check if element exists, then click
+  const button = page.getByRole('button', { name: 'Delete' });
+  
+  if (await button.isVisible()) {
+    await button.click();
+    await expect(page.getByText('Deleted')).toBeVisible();
+  }
+});
+
+Pattern 3: Action Retry Logic
+───────────────────────────────
+test('action with retry', async ({ page }) => {
+  const retryAction = async (action, maxRetries = 3) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await action();
+        break;
+      } catch (error) {
+        if (i === maxRetries - 1) throw error;
+        await page.waitForTimeout(1000);
+      }
+    }
+  };
+  
+  await retryAction(
+    () => page.getByRole('button').click()
+  );
+});
+
+Pattern 4: Multi-Action Sequence
+──────────────────────────────────
+test('action sequence', async ({ page }) => {
+  const form = page.getByRole('form');
+  
+  // Type username
+  await form.getByLabel('Username').fill('testuser');
+  
+  // Type password
+  await form.getByLabel('Password').fill('password123');
+  
+  // Check remember me
+  await form.getByLabel('Remember me').check();
+  
+  // Select country
+  await form.getByLabel('Country').selectOption('USA');
+  
+  // Click submit
+  await form.getByRole('button', { name: 'Login' }).click();
+});
+
+Pattern 5: Wait for Action to Settle
+──────────────────────────────────────
+test('action with network wait', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Wait for navigation after click
+  await Promise.all([
+    page.waitForNavigation(),
+    page.getByRole('link', { name: 'Next' }).click()
+  ]);
+  
+  // Wait for response after submit
+  const responsePromise = page.waitForResponse(
+    response => response.url().includes('/api/save')
+  );
+  
+  await page.getByRole('button', { name: 'Save' }).click();
+  
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+});
+
+================================================================================
+SECTION 12: ACTION TIMEOUTS & RETRIES
+================================================================================
+
+Timeout Configuration
+
+Global timeout (playwright.config.ts):
+──────────────────────────────────────
+export default defineConfig({
+  timeout: 30000,  // 30 seconds per test
+  expect: {
+    timeout: 5000  // 5 seconds per assertion
+  },
+  use: {
+    actionTimeout: 10000  // 10 seconds per action
+  }
+});
+
+Test-level timeout:
+───────────────────
+test.setTimeout(60000); // 60 seconds for this test
+
+test('long test', async ({ page }) => {
+  // Test runs with 60 second timeout
+});
+
+Action-level timeout:
+─────────────────────
+test('action with custom timeout', async ({ page }) => {
+  // Wait longer for this specific action
+  await page.getByRole('button').click({
+    timeout: 60000  // 60 second timeout
+  });
+  
+  // This action has default timeout
+  await page.getByLabel('Input').fill('text');
+});
+
+Handling Timeout Errors:
+─────────────────────────
+test('handle timeout gracefully', async ({ page }) => {
+  try {
+    await page.getByText('Rare Text').click({ timeout: 5000 });
+  } catch (error) {
+    if (error.name === 'TimeoutError') {
+      console.log('Element not found within 5 seconds');
+      // Take alternative action
+    }
+  }
+});
+
+Retry Configuration:
+
+Test retry (playwright.config.ts):
+──────────────────────────────────
+export default defineConfig({
+  retries: 2,  // Retry failed tests 2 times
+  use: {
+    screenshot: 'only-on-failure'
+  }
+});
+
+Conditional retry:
+───────────────────
+test('flaky test', async ({ page }, testInfo) => {
+  if (testInfo.retry > 0) {
+    console.log('This is retry attempt', testInfo.retry);
+  }
+  
+  await page.goto('https://flaky.example.com');
+  // Test logic
+});
+
+Wait Strategies:
+
+// Wait for element stable
+await page.waitForFunction(
+  () => !document.querySelector('.loading')
+);
+
+// Wait for element actionable
+await page.getByRole('button').waitFor({ state: 'visible' });
+
+// Wait with polling
+await page.waitForFunction(async () => {
+  const count = await page.locator('.item').count();
+  return count > 5;
+}, { timeout: 10000 });
+
+================================================================================
+SECTION 13: BEST PRACTICES & TROUBLESHOOTING
+================================================================================
+
+BEST PRACTICES
+
+1. Prefer fill() over pressSequentially()
+   ✓ GOOD:  await input.fill('text');
+   ✗ BAD:   await input.pressSequentially('text');
+   Reason: fill() is faster and sufficient for most cases
+
+2. Use proper locators
+   ✓ GOOD:  await page.getByLabel('Email').fill('user@example.com');
+   ✗ BAD:   await page.locator('#email-field-div-2-input').fill(...);
+   Reason: Locators are more robust to DOM changes
+
+3. Avoid force: true
+   ✓ GOOD:  await locator.click();
+   ✗ BAD:   await locator.click({ force: true });
+   Reason: force bypasses actionability checks
+
+4. Don't use evaluate for interactions
+   ✓ GOOD:  await button.click();
+   ✗ BAD:   await page.evaluate(() => 
+              document.querySelector('button').click()
+            );
+   Reason: evaluate doesn't simulate real events
+
+5. Wait for network, not timeouts
+   ✓ GOOD:  await Promise.all([
+              page.waitForNavigation(),
+              button.click()
+            ]);
+   ✗ BAD:   await button.click();
+             await page.waitForTimeout(2000);
+   Reason: Network-based waiting is deterministic
+
+6. Check actionability separately
+   ✓ GOOD:  await expect(button).toBeEnabled();
+             await button.click();
+   ✗ BAD:   try { await button.click(); } catch(e) {}
+   Reason: Explicit checks improve readability
+
+7. Use accessible locators
+   ✓ GOOD:  getByRole, getByLabel, getByPlaceholder
+   ✗ BAD:   locator('.btn-primary'), locator('#id-123')
+   Reason: More stable and accessibility-friendly
+
+8. Separate concerns
+   ✓ GOOD:  // Login helper
+             async function login(page, email, password) {
+               await page.getByLabel('Email').fill(email);
+               await page.getByLabel('Password').fill(password);
+               await page.getByRole('button', { name: 'Login' }).click();
+             }
+   ✗ BAD:   // All logic in test
+             test('...', async ({ page }) => { ... });
+
+COMMON TROUBLESHOOTING
+
+Issue: "Timeout waiting for element to be visible"
+─────────────────────────────────────────────────
+Causes:
+  • Element doesn't exist
+  • Element is hidden (display:none, visibility:hidden)
+  • Element is outside viewport
+  • JavaScript is still loading
+
+Solutions:
+  1. Verify selector: await page.getByLabel('Email').count() > 0
+  2. Check visibility: await page.getByLabel('Email').isVisible()
+  3. Increase timeout: { timeout: 60000 }
+  4. Wait for page load: await page.waitForLoadState('networkidle')
+
+Issue: "Element is covered by other element"
+──────────────────────────────────────────────
+Causes:
+  • Modal dialog on top
+  • Sticky header covering element
+  • Tooltip or overlay
+  • Floating button
+
+Solutions:
+  1. Close the covering element first
+  2. Scroll to ensure clear view
+  3. Use { force: true } only as last resort
+  4. Adjust timing/wait for animations
+
+Issue: "Click did not trigger expected action"
+────────────────────────────────────────────────
+Causes:
+  • Event listeners not registered
+  • JavaScript not fully loaded
+  • Wrong locator selected element
+
+Solutions:
+  1. Verify correct element: await locator.screenshot()
+  2. Check event listeners: 
+     await page.evaluate(() => {
+       const el = document.querySelector('button');
+       return el._getEventListeners?.('click')?.length || 0;
+     });
+  3. Wait for network: await page.waitForLoadState('networkidle')
+
+Issue: "File upload fails silently"
+────────────────────────────────────
+Causes:
+  • File path doesn't exist
+  • Wrong selector for file input
+  • File input inside form that auto-submits
+
+Solutions:
+  1. Verify file exists: 
+     const fs = require('fs');
+     expect(fs.existsSync(filepath)).toBe(true);
+  2. Verify file input element:
+     await expect(page.locator('input[type="file"]')).toBeAttached();
+  3. Debug with console:
+     await page.getByLabel('Upload').setInputFiles(filepath);
+     console.log('Files set');
+
+Performance Tips:
+
+1. Parallel actions (when independent):
+   await Promise.all([
+     page.getByLabel('Email').fill('user@example.com'),
+     page.getByLabel('Name').fill('John Doe')
+   ]);
+
+2. Batch operations:
+   const selects = page.locator('select');
+   for (let i = 0; i < await selects.count(); i++) {
+     await selects.nth(i).selectOption('option1');
+   }
+
+3. Avoid unnecessary waits:
+   ✗ BAD:   await page.waitForTimeout(2000);
+   ✓ GOOD:  await page.waitForNavigation();
+
+4. Use test.describe.serial() for dependent tests:
+   test.describe.serial('Workflow', () => {
+     // Tests run sequentially
+   });
+
+Summary Table: When to Use Which Action
+
+┌─────────────────┬──────────────────┬────────────┐
+│ Scenario        │ Method           │ Notes      │
+├─────────────────┼──────────────────┼────────────┤
+│ Fill text field │ fill()           │ Default    │
+│ Type slowly     │ pressSequentially │ Rare       │
+│ Check checkbox  │ check()          │ Or uncheck │
+│ Select dropdown │ selectOption()   │ Any method │
+│ Click button    │ click()          │ Default    │
+│ Double click    │ dblclick()       │ On element │
+│ Right click     │ click({button})  │ menu       │
+│ Type keys       │ press()          │ Shortcuts  │
+│ Upload file     │ setInputFiles()  │ File input │
+│ Focus element   │ focus()          │ Events     │
+│ Drag item       │ dragTo()         │ Or manual  │
+│ Scroll page     │ wheel()          │ Manual     │
+└─────────────────┴──────────────────┴────────────┘
+
+================================================================================
+END OF COMPLETE GUIDE
+================================================================================
+
+Source: https://playwright.dev/docs/input
+For more information and updates, visit the official Playwright documentation.
+

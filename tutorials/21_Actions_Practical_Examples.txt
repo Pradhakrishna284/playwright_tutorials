@@ -1,0 +1,1317 @@
+================================================================================
+                    PLAYWRIGHT ACTIONS - PRACTICAL EXAMPLES
+              Real-World Test Scenarios Using All Action Methods
+================================================================================
+
+Source: https://playwright.dev/docs/input
+Format: Complete working test examples with explanations
+
+IMPORTANT: These examples use real-world application scenarios.
+Adapt them to your specific application under test.
+
+================================================================================
+SECTION 1: E-COMMERCE FORM ACTIONS
+================================================================================
+
+TEST 1.1: Product Search and Filter
+────────────────────────────────────────
+
+import { test, expect } from '@playwright/test';
+
+test('search product and apply filters', async ({ page }) => {
+  // Navigate to e-commerce site
+  await page.goto('https://demowebshop.tricentis.com');
+  
+  // FILL ACTION: Search for product
+  const searchBox = page.getByPlaceholder('Search store');
+  await searchBox.fill('laptop');
+  
+  // CLICK ACTION: Submit search
+  const searchButton = page.getByRole('button', { name: /search/i });
+  await searchButton.click();
+  
+  // Verify search results
+  await expect(page.getByText(/laptop/i)).toBeVisible();
+  
+  // KEYBOARD ACTION: Clear and search again
+  await searchBox.fill('');
+  await searchBox.pressSequentially('phone', { delay: 50 });
+  await searchButton.click();
+  
+  // Verify new results
+  const results = page.locator('.product-item');
+  expect(await results.count()).toBeGreaterThan(0);
+});
+
+TEST 1.2: Shopping Cart with Multiple Actions
+───────────────────────────────────────────────
+
+test('add items to cart with quantity selection', async ({ page }) => {
+  await page.goto('https://demowebshop.tricentis.com');
+  
+  // Navigate to products
+  await page.getByRole('link', { name: 'Computers' }).click();
+  
+  // Select first product
+  const product = page.locator('.product-item').first();
+  const productName = await product.locator('.product-title').textContent();
+  
+  await product.click();
+  
+  // FILL ACTION: Enter quantity
+  const quantityInput = page.getByLabel(/quantity/i);
+  await quantityInput.fill('2');
+  
+  // CLICK ACTION: Add to cart
+  const addToCartBtn = page.getByRole('button', { name: /add to cart/i });
+  await addToCartBtn.click();
+  
+  // Verify notification
+  await expect(page.getByText(/added to cart/i)).toBeVisible();
+  
+  // Continue shopping
+  await page.getByRole('link', { name: 'Continue shopping' }).click();
+  
+  // View cart
+  await page.getByRole('link', { name: /shopping cart/i }).click();
+  
+  // Verify item in cart
+  await expect(page.getByText(productName)).toBeVisible();
+});
+
+TEST 1.3: Form Submission with Multiple Input Types
+──────────────────────────────────────────────────────
+
+test('complete checkout form', async ({ page }) => {
+  await page.goto('https://demowebshop.tricentis.com/cart');
+  
+  // Navigate to checkout
+  await page.getByRole('button', { name: /checkout/i }).click();
+  
+  // FILL ACTIONS: Personal Information
+  await page.getByLabel(/first name/i).fill('John');
+  await page.getByLabel(/last name/i).fill('Doe');
+  await page.getByLabel(/email/i).fill('john.doe@example.com');
+  
+  // SELECT ACTION: Country
+  await page.getByLabel(/country/i).selectOption('United States');
+  
+  // FILL ACTIONS: Address
+  await page.getByLabel(/address/i).fill('123 Main Street');
+  await page.getByLabel(/city/i).fill('New York');
+  await page.getByLabel(/state/i).selectOption('NY');
+  await page.getByLabel(/postal code/i).fill('10001');
+  await page.getByLabel(/phone/i).fill('(555) 123-4567');
+  
+  // CHECK ACTIONS: Billing options
+  await page.getByLabel(/same as shipping/i).check();
+  
+  // SELECT: Payment method
+  await page.getByLabel(/credit card/i).selectOption('creditcard');
+  
+  // FILL ACTIONS: Card details
+  await page.getByLabel(/cardholder name/i).fill('John Doe');
+  await page.getByLabel(/card number/i).fill('4111111111111111');
+  await page.getByLabel(/expiration/i).fill('12/25');
+  await page.getByLabel(/cvv/i).fill('123');
+  
+  // CLICK: Place order
+  const placeOrderBtn = page.getByRole('button', { name: /place order/i });
+  await placeOrderBtn.click();
+  
+  // Verify confirmation
+  await expect(page.getByText(/order confirmed/i)).toBeVisible();
+});
+
+================================================================================
+SECTION 2: LOGIN AND AUTHENTICATION
+================================================================================
+
+TEST 2.1: Login with Keyboard Navigation
+───────────────────────────────────────────
+
+test('login using keyboard navigation', async ({ page }) => {
+  await page.goto('https://demowebshop.tricentis.com/login');
+  
+  // FILL: Email
+  const emailField = page.getByLabel(/email/i);
+  await emailField.fill('test@example.com');
+  
+  // KEYBOARD: Tab to password field
+  await page.press('Tab');
+  
+  // TYPE: Password character by character
+  await page.pressSequentially('Password123!', { delay: 50 });
+  
+  // KEYBOARD: Submit with Enter
+  await page.press('Enter');
+  
+  // Verify logged in
+  await expect(page.getByText(/welcome/i)).toBeVisible();
+  
+  // Verify user menu appears
+  const userMenu = page.getByRole('button', { name: /my account/i });
+  await expect(userMenu).toBeVisible();
+});
+
+TEST 2.2: Sign Up with Validation
+──────────────────────────────────
+
+test('sign up with email and password validation', async ({ page }) => {
+  await page.goto('https://demowebshop.tricentis.com/register');
+  
+  // SELECT: Gender
+  await page.getByLabel(/female/i).check();
+  
+  // FILL: Personal info
+  await page.getByLabel(/first name/i).fill('Jane');
+  await page.getByLabel(/last name/i).fill('Smith');
+  
+  // FILL: Email
+  const emailField = page.getByLabel(/email/i);
+  await emailField.fill('jane.smith@example.com');
+  
+  // FILL: Password
+  const passwordField = page.getByLabel(/^password$/i);
+  await passwordField.fill('SecurePass123!');
+  
+  // FILL: Confirm password
+  const confirmField = page.getByLabel(/confirm password/i);
+  await confirmField.fill('SecurePass123!');
+  
+  // CHECK: Newsletter
+  await page.getByLabel(/newsletter/i).check();
+  
+  // CLICK: Register
+  await page.getByRole('button', { name: /register/i }).click();
+  
+  // Verify success
+  await expect(page.getByText(/registered successfully/i)).toBeVisible();
+});
+
+TEST 2.3: Multi-Step Authentication
+──────────────────────────────────────
+
+test('two-factor authentication flow', async ({ page }) => {
+  await page.goto('https://demowebshop.tricentis.com/login');
+  
+  // Step 1: Login
+  await page.getByLabel(/email/i).fill('user@example.com');
+  await page.getByLabel(/password/i).fill('password123');
+  await page.getByRole('button', { name: /login/i }).click();
+  
+  // Step 2: 2FA Code entry
+  const code2fa = page.getByLabel(/authentication code/i);
+  
+  // TYPE: Enter 2FA code
+  await code2fa.pressSequentially('123456', { delay: 100 });
+  
+  // CLICK: Verify
+  await page.getByRole('button', { name: /verify/i }).click();
+  
+  // Verify authenticated
+  await expect(page.getByText(/welcome/i)).toBeVisible();
+});
+
+================================================================================
+SECTION 3: FORM INTERACTIONS - ADVANCED
+================================================================================
+
+TEST 3.1: Dynamic Form with Conditional Fields
+─────────────────────────────────────────────────
+
+test('form with conditional fields based on selection', async ({ page }) => {
+  await page.goto('https://example.com/dynamic-form');
+  
+  // SELECT: Account type (triggers conditional fields)
+  const accountType = page.getByLabel(/account type/i);
+  await accountType.selectOption('business');
+  
+  // Wait for conditional fields to appear
+  await expect(page.getByLabel(/company name/i)).toBeVisible();
+  
+  // FILL: Conditional field
+  await page.getByLabel(/company name/i).fill('Acme Corporation');
+  await page.getByLabel(/tax id/i).fill('12-3456789');
+  
+  // Change selection
+  await accountType.selectOption('individual');
+  
+  // Verify business fields disappear
+  await expect(page.getByLabel(/company name/i)).not.toBeVisible();
+  
+  // FILL: Individual fields
+  await page.getByLabel(/ssn/i).fill('123-45-6789');
+});
+
+TEST 3.2: Multi-Select Dropdowns - Basic Patterns
+──────────────────────────────────────────────────
+
+test('multi-select by value - colors example', async ({ page }) => {
+  await page.goto('https://example.com/colors-form');
+  
+  // SELECT: Multiple colors by value
+  const colorSelect = page.getByLabel('Choose Colors');
+  await colorSelect.selectOption(['red', 'white', 'green', 'yellow']);
+  
+  // VERIFY: All colors selected
+  await expect(colorSelect).toHaveValues(['red', 'white', 'green', 'yellow']);
+  
+  // LOG: Selected values
+  const selectedValues = await colorSelect.evaluate(() => {
+    const selected = document.querySelectorAll('option:checked');
+    return Array.from(selected).map((option: any) => option.value);
+  });
+  console.log(`Selected values: ${selectedValues.join(', ')}`);
+});
+
+test('multi-select by label - multiple selections', async ({ page }) => {
+  await page.goto('https://example.com/interests-form');
+  
+  // SELECT: Multiple options by label
+  const interestSelect = page.locator('#interests');
+  await interestSelect.selectOption([
+    { label: 'Sports' },
+    { label: 'Music' },
+    { label: 'Reading' }
+  ]);
+  
+  // VERIFY: Check selected labels
+  const selectedLabels = await interestSelect.evaluate(() => {
+    const selected = document.querySelectorAll('option:checked');
+    return Array.from(selected).map((option: any) => option.label);
+  });
+  expect(selectedLabels).toEqual(['Sports', 'Music', 'Reading']);
+  console.log(`Selected labels: ${selectedLabels.join(', ')}`);
+});
+
+test('multi-select by index - position-based selection', async ({ page }) => {
+  await page.goto('https://example.com/colors-form');
+  
+  // SELECT: Multiple by index position
+  const colorSelect = page.locator('#colors');
+  await colorSelect.selectOption([
+    { index: 0 },  // First option
+    { index: 2 },  // Third option
+    { index: 4 }   // Fifth option
+  ]);
+  
+  // VERIFY: Count of selections
+  const selectedCount = await colorSelect.evaluate(() => {
+    return document.querySelectorAll('option:checked').length;
+  });
+  expect(selectedCount).toBe(3);
+  
+  // LOG: Selected values by index
+  const selectedByIndex = await colorSelect.evaluate(() => {
+    const selected = document.querySelectorAll('option:checked');
+    return Array.from(selected).map((option: any) => option.value);
+  });
+  console.log(`Selected values by index: ${selectedByIndex.join(', ')}`);
+});
+
+TEST 3.2.5: Multi-Select Deselection and Clearing
+──────────────────────────────────────────────────
+
+test('deselect all options and verify empty state', async ({ page }) => {
+  await page.goto('https://example.com/colors-form');
+  
+  const colorSelect = page.getByLabel('Choose Colors');
+  
+  // STEP 1: Select multiple colors
+  await colorSelect.selectOption(['red', 'white', 'green']);
+  await expect(colorSelect).toHaveValues(['red', 'white', 'green']);
+  
+  // STEP 2: Deselect all by passing empty array
+  await colorSelect.selectOption([]);
+  
+  // STEP 3: Verify empty
+  const deselectedValues = await colorSelect.evaluate(() => {
+    const selected = document.querySelectorAll('option:checked');
+    return Array.from(selected).map((option: any) => option.value);
+  });
+  
+  expect(deselectedValues).toEqual([]);
+  console.log('All options deselected successfully.');
+});
+
+test('partial deselection by re-selecting subset', async ({ page }) => {
+  await page.goto('https://example.com/colors-form');
+  
+  const colorSelect = page.getByLabel('Choose Colors');
+  
+  // STEP 1: Select 4 colors
+  await colorSelect.selectOption(['red', 'white', 'green', 'yellow']);
+  let selectedCount = await colorSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(selectedCount).toBe(4);
+  
+  // STEP 2: Re-select only 2 (effectively deselects the other 2)
+  await colorSelect.selectOption(['red', 'blue']);
+  selectedCount = await colorSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(selectedCount).toBe(2);
+  
+  // STEP 3: Verify exact values
+  await expect(colorSelect).toHaveValues(['red', 'blue']);
+});
+
+TEST 3.2.6: Multi-Select - Available Options Inspection
+─────────────────────────────────────────────────────
+
+test('inspect all available options before selection', async ({ page }) => {
+  await page.goto('https://example.com/colors-form');
+  
+  const colorSelect = page.locator('#colors');
+  
+  // GET: All option elements
+  const allOptions = page.locator('#colors > option');
+  
+  // GET: Total count
+  const optionsCount = await allOptions.count();
+  console.log(`Total options in dropdown: ${optionsCount}`);
+  expect(optionsCount).toBe(7);
+  
+  // GET: All option texts
+  const allOptionTexts = await allOptions.allTextContents();
+  console.log('All option labels:', allOptionTexts);
+  
+  // GET: All option values
+  const allOptionValues = await colorSelect.evaluate(() => {
+    const options = document.querySelectorAll('option');
+    return Array.from(options).map((option: any) => option.value);
+  });
+  console.log('All option values:', allOptionValues);
+  
+  // ITERATE: Through each option
+  for (let i = 0; i < optionsCount; i++) {
+    const optionLabel = await allOptions.nth(i).innerText();
+    const optionValue = await allOptions.nth(i).getAttribute('value');
+    console.log(`Option ${i + 1}: Label = ${optionLabel}, Value = ${optionValue}`);
+  }
+});
+
+test('select options conditionally based on available options', async ({ page }) => {
+  await page.goto('https://example.com/colors-form');
+  
+  const colorSelect = page.getByLabel('Choose Colors');
+  
+  // GET: Available options
+  const availableOptions = await colorSelect.locator('option')
+    .allTextContents();
+  console.log('Available colors:', availableOptions);
+  
+  // SELECT: Only colors that exist (safe selection)
+  const desiredColors = ['Red', 'Blue', 'Green'].filter(
+    color => availableOptions.includes(color)
+  );
+  
+  if (desiredColors.length > 0) {
+    await colorSelect.selectOption(
+      desiredColors.map(label => ({ label }))
+    );
+  }
+  
+  // VERIFY: Successfully selected
+  const selectedCount = await colorSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(selectedCount).toBe(desiredColors.length);
+});
+
+TEST 3.2.7: Multi-Select - Dynamic Population
+───────────────────────────────────────────
+
+test('multi-select with dynamically loaded options', async ({ page }) => {
+  await page.goto('https://example.com/dynamic-colors');
+  
+  const colorSelect = page.getByLabel('Choose Colors');
+  
+  // WAIT: For options to load
+  await page.waitForFunction(() => {
+    const options = document.querySelectorAll('#colors option');
+    return options.length > 3;
+  });
+  
+  console.log('Options loaded successfully');
+  
+  // GET: Available options
+  const availableOptions = await colorSelect.locator('option')
+    .allTextContents();
+  
+  // SELECT: Available options
+  const toSelect = availableOptions.slice(0, 3); // First 3
+  if (toSelect.length > 0) {
+    await colorSelect.selectOption(
+      toSelect.map(label => ({ label }))
+    );
+  }
+  
+  // VERIFY: Selection successful
+  const selectedCount = await colorSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  expect(selectedCount).toBe(toSelect.length);
+});
+
+TEST 3.2.8: Multi-Select - Count at Various Stages
+──────────────────────────────────────────────────
+
+test('track selection count at different stages', async ({ page }) => {
+  await page.goto('https://example.com/colors-form');
+  
+  const colorSelect = page.getByLabel('Choose Colors');
+  
+  // STAGE 1: Initial selection of 2
+  await colorSelect.selectOption(['blue', 'yellow']);
+  let selectedCount = await colorSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  console.log(`Count after initial selection: ${selectedCount}`);
+  expect(selectedCount).toBe(2);
+  
+  // STAGE 2: Add more (now 4 total)
+  await colorSelect.selectOption(['red', 'green', 'blue', 'yellow']);
+  selectedCount = await colorSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  console.log(`Count after adding more selections: ${selectedCount}`);
+  expect(selectedCount).toBe(4);
+  
+  // STAGE 3: Partial re-selection (back to 2)
+  await colorSelect.selectOption(['red', 'green']);
+  selectedCount = await colorSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  console.log(`Count after partial reselection: ${selectedCount}`);
+  expect(selectedCount).toBe(2);
+  
+  // STAGE 4: Complete deselection (0)
+  await colorSelect.selectOption([]);
+  selectedCount = await colorSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length
+  );
+  console.log(`Count after complete deselection: ${selectedCount}`);
+  expect(selectedCount).toBe(0);
+});
+
+TEST 3.3: Form with Cascade and Multi-Select Dropdowns Combined
+──────────────────────────────────────────────────────────────
+
+test('multi-select and cascade dropdowns', async ({ page }) => {
+  await page.goto('https://example.com/address-form');
+  
+  // SELECT: Country (primary)
+  const country = page.getByLabel(/country/i);
+  await country.selectOption('United States');
+  
+  // Wait for state options to load
+  await page.waitForFunction(async () => {
+    const states = await page.getByLabel(/state/i)
+      .locator('option').count();
+    return states > 5;
+  });
+  
+  // SELECT: Multiple states (if multi-select)
+  const state = page.getByLabel(/state/i);
+  const availableStates = await state.locator('option').allTextContents();
+  
+  if (availableStates.includes('California')) {
+    await state.selectOption(['CA', 'NY', 'TX']); // If multi-select
+    // or just CA if single select
+    // await state.selectOption('CA');
+  }
+  
+  // Wait for city options to load
+  await page.waitForTimeout(300);
+  
+  // SELECT: City (dependent)
+  const city = page.getByLabel(/city/i);
+  await city.selectOption({ index: 0 });
+});
+
+TEST 3.4: Checkbox and Radio Button Combinations
+────────────────────────────────────────────────────
+
+test('form with various checkbox and radio states', async ({ page }) => {
+  await page.goto('https://example.com/preferences');
+  
+  // RADIO: Select shipping method
+  const shippingRadios = page.locator('input[name="shipping"]');
+  
+  // Check first option
+  await shippingRadios.nth(0).check();
+  await expect(shippingRadios.nth(0)).toBeChecked();
+  
+  // Switch to second option
+  await shippingRadios.nth(1).check();
+  await expect(shippingRadios.nth(1)).toBeChecked();
+  await expect(shippingRadios.nth(0)).not.toBeChecked();
+  
+  // CHECKBOX: Multiple selections
+  const notificationCheckboxes = page.locator(
+    'input[type="checkbox"][name*="notification"]'
+  );
+  const count = await notificationCheckboxes.count();
+  
+  // Check first 3
+  for (let i = 0; i < Math.min(3, count); i++) {
+    await notificationCheckboxes.nth(i).check();
+  }
+  
+  // Verify all 3 are checked
+  for (let i = 0; i < Math.min(3, count); i++) {
+    await expect(notificationCheckboxes.nth(i)).toBeChecked();
+  }
+  
+  // TOGGLE: A specific checkbox
+  const agreeCheckbox = page.getByLabel(/agree to terms/i);
+  
+  if (await agreeCheckbox.isChecked()) {
+    await agreeCheckbox.uncheck();
+  } else {
+    await agreeCheckbox.check();
+  }
+  
+  // CLICK: Submit
+  await page.getByRole('button', { name: /submit/i }).click();
+});
+
+================================================================================
+SECTION 4: FILE UPLOAD AND DOWNLOAD
+================================================================================
+
+TEST 4.1: Single File Upload
+──────────────────────────────
+
+import path from 'path';
+
+test('upload single document', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  // UPLOAD FILE: Select file
+  const filePath = path.join(__dirname, 'documents', 'resume.pdf');
+  
+  await page.getByLabel(/upload resume/i).setInputFiles(filePath);
+  
+  // Verify file was selected
+  const uploadInput = page.locator('input[type="file"]');
+  const files = await uploadInput.evaluate((el: any) => {
+    return Array.from(el.files).map(f => f.name);
+  });
+  expect(files).toContain('resume.pdf');
+  
+  // CLICK: Upload button
+  await page.getByRole('button', { name: /upload/i }).click();
+  
+  // Verify success
+  await expect(page.getByText(/uploaded successfully/i)).toBeVisible();
+});
+
+TEST 4.2: Multiple File Upload
+────────────────────────────────
+
+test('upload multiple documents at once', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  // UPLOAD FILES: Multiple files
+  const files = [
+    path.join(__dirname, 'documents', 'document1.pdf'),
+    path.join(__dirname, 'documents', 'document2.docx'),
+    path.join(__dirname, 'images', 'photo.jpg')
+  ];
+  
+  await page.getByLabel(/upload documents/i).setInputFiles(files);
+  
+  // Verify all files selected
+  const uploadInput = page.locator('input[type="file"]');
+  const selectedFiles = await uploadInput.evaluate((el: any) => {
+    return Array.from(el.files).map(f => f.name);
+  });
+  
+  expect(selectedFiles).toHaveLength(3);
+  expect(selectedFiles).toContain('document1.pdf');
+  expect(selectedFiles).toContain('document2.docx');
+  expect(selectedFiles).toContain('photo.jpg');
+  
+  // Show selected files in UI
+  const fileList = page.locator('.file-list');
+  for (const file of selectedFiles) {
+    await expect(fileList).toContainText(file);
+  }
+  
+  // CLICK: Upload
+  await page.getByRole('button', { name: /upload all/i }).click();
+  
+  // Verify
+  await expect(page.getByText(/all files uploaded/i)).toBeVisible();
+});
+
+TEST 4.3: File Upload from Buffer (Dynamic Content)
+─────────────────────────────────────────────────────
+
+test('upload dynamically created file', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  // CREATE: Dynamic file content
+  const csvContent = 'Name,Email,Phone\nJohn,john@example.com,555-1234\n';
+  const fileBuffer = Buffer.from(csvContent);
+  
+  // UPLOAD: From buffer
+  await page.getByLabel(/upload csv/i).setInputFiles({
+    name: 'contacts.csv',
+    mimeType: 'text/csv',
+    buffer: fileBuffer
+  });
+  
+  // Verify uploaded
+  const uploadInput = page.locator('input[type="file"]');
+  const fileName = await uploadInput.evaluate((el: any) => {
+    return el.files[0]?.name;
+  });
+  expect(fileName).toBe('contacts.csv');
+});
+
+TEST 4.4: File Upload with Progress Monitoring
+────────────────────────────────────────────────
+
+test('monitor upload progress', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  const filePath = path.join(__dirname, 'large-file.zip');
+  
+  // UPLOAD: Set file
+  await page.getByLabel(/upload large file/i).setInputFiles(filePath);
+  
+  // WAIT: For upload progress to appear
+  const progressBar = page.getByRole('progressbar');
+  await expect(progressBar).toBeVisible();
+  
+  // WAIT: For upload to complete (progress = 100%)
+  await page.waitForFunction(() => {
+    return page.locator('[data-progress="100"]').isVisible();
+  }, { timeout: 60000 });
+  
+  // Verify completion
+  await expect(page.getByText(/upload complete/i)).toBeVisible();
+});
+
+TEST 4.5: Handle File Chooser Dialog
+──────────────────────────────────────
+
+test('file upload with file chooser dialog', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  // LISTEN: For file chooser
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  
+  // CLICK: Upload button (triggers dialog)
+  await page.getByRole('button', { name: /choose file/i }).click();
+  
+  // GET: File chooser
+  const fileChooser = await fileChooserPromise;
+  
+  // SET: Files through chooser
+  const filePath = path.join(__dirname, 'documents', 'report.pdf');
+  await fileChooser.setFiles(filePath);
+  
+  // WAIT: For upload to complete
+  await page.waitForNavigation();
+  
+  // Verify success
+  await expect(page.getByText(/successfully uploaded/i)).toBeVisible();
+});
+
+================================================================================
+SECTION 5: DRAG AND DROP OPERATIONS
+================================================================================
+
+TEST 5.1: Simple Drag and Drop
+────────────────────────────────
+
+test('drag item to drop zone', async ({ page }) => {
+  await page.goto('https://example.com/drag-drop');
+  
+  const draggable = page.locator('[draggable="true"]').first();
+  const dropZone = page.locator('[data-drop-zone="main"]');
+  
+  // DRAG: Item to drop zone
+  await draggable.dragTo(dropZone);
+  
+  // Verify item moved
+  const items = dropZone.locator('[draggable="true"]');
+  expect(await items.count()).toBeGreaterThan(0);
+});
+
+TEST 5.2: Reorder List Items via Drag
+──────────────────────────────────────
+
+test('reorder todo list items', async ({ page }) => {
+  await page.goto('https://example.com/todo');
+  
+  const items = page.locator('.todo-item');
+  
+  // Get initial order
+  const initialTexts = await items.allTextContents();
+  console.log('Initial order:', initialTexts);
+  
+  const firstItem = items.first();
+  const lastItem = items.last();
+  
+  // DRAG: First item to last position
+  await firstItem.dragTo(lastItem);
+  
+  // Get new order
+  const newTexts = await items.allTextContents();
+  console.log('New order:', newTexts);
+  
+  // Verify order changed
+  expect(newTexts).not.toEqual(initialTexts);
+  
+  // Verify persistence
+  await page.reload();
+  const reloadedTexts = await page.locator('.todo-item').allTextContents();
+  expect(reloadedTexts).toEqual(newTexts);
+});
+
+TEST 5.3: Drag Multiple Items to Container
+──────────────────────────────────────────────
+
+test('drag multiple items to shopping cart', async ({ page }) => {
+  await page.goto('https://example.com/shop');
+  
+  const products = page.locator('.product-card');
+  const cart = page.locator('[data-testid="shopping-cart"]');
+  
+  // Get initial cart count
+  let cartCount = 0;
+  
+  // DRAG: First 3 products to cart
+  const productCount = await products.count();
+  const itemsToDrag = Math.min(3, productCount);
+  
+  for (let i = 0; i < itemsToDrag; i++) {
+    await products.nth(i).dragTo(cart);
+    cartCount++;
+    
+    // Wait between drags
+    await page.waitForTimeout(300);
+  }
+  
+  // Verify items in cart
+  const cartItems = cart.locator('.cart-item');
+  expect(await cartItems.count()).toBe(cartCount);
+});
+
+TEST 5.4: Manual Drag with Precise Control
+───────────────────────────────────────────
+
+test('drag with multiple hover events for proper dragover', async ({ page }) => {
+  await page.goto('https://example.com/kanban');
+  
+  const task = page.locator('[data-task-id="task1"]');
+  const targetColumn = page.locator('[data-column-id="in-progress"]');
+  
+  // MANUAL DRAG: With precise control
+  await task.hover();
+  await page.mouse.down();
+  
+  // Move to target
+  await targetColumn.hover();
+  
+  // Move again (ensure dragover fires)
+  await targetColumn.hover();
+  
+  await page.mouse.up();
+  
+  // Verify task moved to new column
+  const items = targetColumn.locator('[data-task-id]');
+  expect(await items.count()).toBeGreaterThan(0);
+});
+
+================================================================================
+SECTION 6: KEYBOARD INTERACTIONS
+================================================================================
+
+TEST 6.1: Form Navigation with Tab
+───────────────────────────────────
+
+test('navigate form with Tab key', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // FOCUS: First field
+  const firstInput = page.getByLabel(/first name/i);
+  await firstInput.focus();
+  
+  // Enter first name
+  await page.pressSequentially('John', { delay: 50 });
+  
+  // TAB: Move to next field
+  await page.press('Tab');
+  
+  // Enter last name
+  await page.pressSequentially('Doe', { delay: 50 });
+  
+  // TAB: Move to email
+  await page.press('Tab');
+  
+  // Enter email
+  await page.pressSequentially('john@example.com', { delay: 30 });
+  
+  // SHIFT+TAB: Move back to last name
+  await page.press('Shift+Tab');
+  
+  // Verify focus
+  const focused = await page.evaluate(() => {
+    return (document.activeElement as HTMLInputElement)?.name;
+  });
+  expect(focused).toBe('lastName');
+  
+  // TAB: Forward again to email
+  await page.press('Tab');
+  await page.press('Tab');
+  
+  // ENTER: Submit form
+  await page.press('Enter');
+  
+  // Verify submission
+  await expect(page.getByText(/submitted successfully/i)).toBeVisible();
+});
+
+TEST 6.2: Keyboard Shortcuts
+──────────────────────────────
+
+test('test keyboard shortcuts', async ({ page }) => {
+  await page.goto('https://example.com/editor');
+  
+  // Focus editor
+  const editor = page.getByRole('textbox');
+  await editor.focus();
+  
+  // TYPE: Some content
+  await editor.pressSequentially('Hello world');
+  
+  // CTRL+A: Select all
+  await page.press('Control+A');
+  
+  // Verify selection
+  const selected = await page.evaluate(() => {
+    return window.getSelection()?.toString();
+  });
+  expect(selected).toBe('Hello world');
+  
+  // CTRL+C: Copy
+  await page.press('Control+C');
+  
+  // CTRL+Z: Undo
+  await page.press('Control+Z');
+  
+  // Verify undo worked
+  const content = await editor.inputValue();
+  expect(content.length).toBeLessThan(11);
+  
+  // CTRL+Y or CTRL+SHIFT+Z: Redo
+  await page.press('Control+Shift+Z');
+  
+  // Verify redo worked
+  const redoneContent = await editor.inputValue();
+  expect(redoneContent).toBe('Hello world');
+});
+
+TEST 6.3: Search with Autocomplete via Keyboard
+─────────────────────────────────────────────────
+
+test('search with keyboard and autocomplete', async ({ page }) => {
+  await page.goto('https://example.com/search');
+  
+  const searchInput = page.getByPlaceholder(/search/i);
+  
+  // TYPE: First few characters
+  await searchInput.pressSequentially('java', { delay: 100 });
+  
+  // Wait for suggestions
+  const suggestions = page.getByRole('option');
+  await expect(suggestions).toHaveCount(5);
+  
+  // ARROW DOWN: Navigate suggestions
+  await page.press('ArrowDown');
+  await page.press('ArrowDown');
+  
+  // Verify highlighted
+  const highlighted = suggestions.nth(1);
+  await expect(highlighted).toHaveClass(/highlighted/);
+  
+  // ARROW UP: Go back
+  await page.press('ArrowUp');
+  
+  // ENTER: Select
+  await page.press('Enter');
+  
+  // Verify selection
+  const selected = await searchInput.inputValue();
+  expect(selected).toBeTruthy();
+});
+
+TEST 6.4: Keyboard Escape and Modal Closure
+──────────────────────────────────────────────
+
+test('close modal with Escape key', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // CLICK: Open modal
+  await page.getByRole('button', { name: /open dialog/i }).click();
+  
+  // Verify modal visible
+  const modal = page.getByRole('dialog');
+  await expect(modal).toBeVisible();
+  
+  // PRESS: Escape to close
+  await page.press('Escape');
+  
+  // Verify closed
+  await expect(modal).not.toBeVisible();
+});
+
+================================================================================
+SECTION 7: SCROLLING AND INFINITE LISTS
+================================================================================
+
+TEST 7.1: Auto-Scroll for Element Interaction
+────────────────────────────────────────────────
+
+test('automatic scrolling when clicking distant element', async ({ page }) => {
+  await page.goto('https://example.com/long-page');
+  
+  // Get page height
+  const pageHeight = await page.evaluate(() => {
+    return document.documentElement.scrollHeight;
+  });
+  
+  // Element is at bottom
+  const footerButton = page.getByText('Footer');
+  
+  // CLICK: Playwright auto-scrolls
+  await footerButton.click();
+  
+  // Verify button was scrolled into view
+  const isInViewport = await footerButton.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    return rect.top >= 0 && rect.bottom <= window.innerHeight;
+  });
+  expect(isInViewport).toBe(true);
+});
+
+TEST 7.2: Manual Scroll into View
+──────────────────────────────────
+
+test('scroll element into view for screenshot', async ({ page }) => {
+  await page.goto('https://example.com/long-page');
+  
+  // Find section
+  const section = page.getByText('Detailed Specifications');
+  
+  // SCROLL: Into view
+  await section.scrollIntoViewIfNeeded();
+  
+  // Verify visible
+  await expect(section).toBeVisible();
+  
+  // Take screenshot
+  await page.screenshot({ path: 'section.png' });
+});
+
+TEST 7.3: Infinite List Loading
+──────────────────────────────────
+
+test('load more items in infinite scroll', async ({ page }) => {
+  await page.goto('https://example.com/infinite-feed');
+  
+  // Get initial items
+  const items = page.locator('.feed-item');
+  let initialCount = await items.count();
+  console.log('Initial items:', initialCount);
+  
+  // SCROLL: To bottom
+  const lastItem = items.last();
+  await lastItem.scrollIntoViewIfNeeded();
+  
+  // Wait for loading indicator
+  const loader = page.getByText(/loading more/i);
+  await expect(loader).toBeVisible({ timeout: 5000 });
+  
+  // WAIT: For new items to load
+  await page.waitForFunction(async () => {
+    const currentCount = await page.locator('.feed-item').count();
+    return currentCount > initialCount;
+  });
+  
+  // Get new count
+  const newCount = await items.count();
+  console.log('Items after scroll:', newCount);
+  expect(newCount).toBeGreaterThan(initialCount);
+  
+  // SCROLL: Again to load more
+  const newLastItem = page.locator('.feed-item').last();
+  await newLastItem.scrollIntoViewIfNeeded();
+  
+  // WAIT: For next batch
+  await page.waitForFunction(async () => {
+    const currentCount = await page.locator('.feed-item').count();
+    return currentCount > newCount;
+  });
+});
+
+TEST 7.4: Mouse Wheel Scroll
+──────────────────────────────
+
+test('scroll with mouse wheel', async ({ page }) => {
+  await page.goto('https://example.com/page');
+  
+  // Get initial scroll position
+  const initialScroll = await page.evaluate(() => window.scrollY);
+  
+  // SCROLL: Down with mouse wheel
+  await page.mouse.wheel(0, 10);  // Positive Y = down
+  
+  // Get new scroll position
+  const newScroll = await page.evaluate(() => window.scrollY);
+  expect(newScroll).toBeGreaterThan(initialScroll);
+  
+  // SCROLL: Up
+  await page.mouse.wheel(0, -10);  // Negative Y = up
+  
+  // Get scroll back up
+  const upScroll = await page.evaluate(() => window.scrollY);
+  expect(upScroll).toBeLessThan(newScroll);
+});
+
+================================================================================
+SECTION 8: COMPLEX WORKFLOWS
+================================================================================
+
+TEST 8.1: Multi-Step Booking Process
+──────────────────────────────────────
+
+test('complete flight booking workflow', async ({ page }) => {
+  await page.goto('https://example.com/flights');
+  
+  // STEP 1: Search flights
+  const fromCity = page.getByLabel(/from/i);
+  const toCity = page.getByLabel(/to/i);
+  
+  await fromCity.fill('New York');
+  await toCity.fill('Los Angeles');
+  
+  // SELECT: Date
+  const departDate = page.getByLabel(/depart date/i);
+  await departDate.fill('2025-06-15');
+  
+  // CLICK: Search
+  await page.getByRole('button', { name: /search/i }).click();
+  
+  // STEP 2: Select flight
+  const flightOption = page.locator('.flight-option').first();
+  await flightOption.click();
+  
+  // STEP 3: Passenger details
+  await page.getByLabel(/first name/i).fill('John');
+  await page.getByLabel(/last name/i).fill('Doe');
+  await page.getByLabel(/email/i).fill('john@example.com');
+  await page.getByLabel(/phone/i).fill('555-1234');
+  
+  // STEP 4: Seat selection
+  const seatGrid = page.locator('.seat-grid');
+  const availableSeat = seatGrid.locator('.seat:not(.taken)').first();
+  await availableSeat.click();
+  
+  // STEP 5: Meal selection
+  const mealSelect = page.getByLabel(/meals/i);
+  await mealSelect.selectOption('vegetarian');
+  
+  // STEP 6: Payment
+  const paymentMethod = page.getByLabel(/credit card/i);
+  await paymentMethod.check();
+  
+  const cardNumber = page.getByLabel(/card number/i);
+  await cardNumber.fill('4111111111111111');
+  
+  // STEP 7: Confirmation
+  await page.getByRole('button', { name: /book flight/i }).click();
+  
+  // Verify confirmation
+  await expect(page.getByText(/booking confirmed/i)).toBeVisible();
+});
+
+TEST 8.2: Create, Edit, Delete Workflow
+──────────────────────────────────────────
+
+test('CRUD operations on todo items', async ({ page }) => {
+  await page.goto('https://example.com/todos');
+  
+  // CREATE: New todo
+  const input = page.getByPlaceholder(/add new todo/i);
+  await input.fill('Complete project documentation');
+  await page.getByRole('button', { name: /add/i }).click();
+  
+  // Verify created
+  const newItem = page.getByText('Complete project documentation');
+  await expect(newItem).toBeVisible();
+  
+  // READ: Get item details (click to view)
+  const itemRow = newItem.locator('..');
+  await itemRow.getByRole('button', { name: /details/i }).click();
+  
+  await expect(page.getByText(/created today/i)).toBeVisible();
+  
+  // EDIT: Update item
+  const editButton = itemRow.getByRole('button', { name: /edit/i });
+  await editButton.click();
+  
+  const editInput = page.getByLabel(/todo text/i);
+  await editInput.fill('');
+  await editInput.fill('Complete project documentation - REVISED');
+  
+  await page.getByRole('button', { name: /save/i }).click();
+  
+  // Verify edited
+  await expect(page.getByText(/REVISED/i)).toBeVisible();
+  
+  // DELETE: Remove item
+  const deleteButton = itemRow.getByRole('button', { name: /delete/i });
+  await deleteButton.click();
+  
+  // Confirm delete
+  await page.getByRole('button', { name: /confirm delete/i }).click();
+  
+  // Verify deleted
+  await expect(newItem).not.toBeVisible();
+});
+
+================================================================================
+SECTION 9: ACCESSIBILITY AND SPECIAL CASES
+================================================================================
+
+TEST 9.1: Accessible Form Interaction
+────────────────────────────────────────
+
+test('interact with form using accessible locators', async ({ page }) => {
+  await page.goto('https://example.com/accessible-form');
+  
+  // Use accessible locators (role-based)
+  const form = page.getByRole('form', { name: /contact/i });
+  
+  // FILL: Using labels (accessible)
+  await form.getByLabel(/your name/i).fill('Jane Smith');
+  await form.getByLabel(/email address/i).fill('jane@example.com');
+  await form.getByLabel(/message/i).fill('Thank you for your service');
+  
+  // CHECKBOX: Accessible
+  await form.getByLabel(/subscribe to newsletter/i).check();
+  
+  // SUBMIT: Using button role
+  await form.getByRole('button', { name: /submit/i }).click();
+  
+  // Verify success message
+  await expect(page.getByRole('status')).toContainText(/thank you/i);
+});
+
+TEST 9.2: ContentEditable Elements
+───────────────────────────────────
+
+test('interact with contenteditable divs', async ({ page }) => {
+  await page.goto('https://example.com/editor');
+  
+  // Find contenteditable element
+  const editor = page.locator('[contenteditable="true"]').first();
+  
+  // FILL: Works on contenteditable
+  await editor.fill('This is editable content');
+  
+  // VERIFY: Content changed
+  const content = await editor.textContent();
+  expect(content).toContain('editable content');
+  
+  // INTERACT: Place cursor and type
+  await editor.click();
+  
+  // Move to end
+  await page.press('End');
+  
+  // Add more text
+  await page.pressSequentially(' - edited!');
+});
+
+TEST 9.3: Elements Appearing After Animations
+────────────────────────────────────────────────
+
+test('interact with elements after CSS animation', async ({ page }) => {
+  await page.goto('https://example.com/animated-modal');
+  
+  // CLICK: Trigger button with animation
+  const trigger = page.getByRole('button', { name: /open/i });
+  await trigger.click();
+  
+  // Wait for animation (fade-in, slide-in, etc.)
+  const modal = page.getByRole('dialog');
+  
+  // Instead of waitForTimeout, verify visibility
+  await expect(modal).toBeVisible();
+  
+  // Now interact with modal content
+  await modal.getByLabel(/name/i).fill('John');
+  await modal.getByRole('button', { name: /submit/i }).click();
+});
+
+TEST 9.4: Handle Dynamic Attributes
+──────────────────────────────────────
+
+test('interact with elements using data attributes', async ({ page }) => {
+  await page.goto('https://example.com/data-driven');
+  
+  // FILL: Using data-testid
+  await page.getByTestId('username-input').fill('testuser');
+  await page.getByTestId('password-input').fill('password123');
+  
+  // CLICK: Using data-testid
+  await page.getByTestId('login-button').click();
+  
+  // Verify: Using data-testid
+  await expect(page.getByTestId('user-welcome')).toContainText('testuser');
+});
+
+================================================================================
+END OF PRACTICAL EXAMPLES
+================================================================================
+
+SUMMARY TABLE: Which Action to Use
+
+┌──────────────────┬──────────────────┬──────────────────────────┐
+│ Scenario         │ Action Method    │ Example                  │
+├──────────────────┼──────────────────┼──────────────────────────┤
+│ Type in textbox  │ fill()           │ input.fill('text')       │
+│ Click button     │ click()          │ button.click()           │
+│ Select dropdown  │ selectOption()   │ select.selectOption('v') │
+│ Check checkbox   │ check()          │ checkbox.check()         │
+│ Type slowly      │ pressSequentially│ input.pressSequentially()│
+│ Press key        │ press()          │ page.press('Enter')      │
+│ Upload file      │ setInputFiles()  │ input.setInputFiles(f)   │
+│ Set focus        │ focus()          │ input.focus()            │
+│ Drag element     │ dragTo()         │ elem.dragTo(target)      │
+│ Scroll element   │ scrollIntoView   │ elem.scrollIntoViewIfNeed│
+└──────────────────┴──────────────────┴──────────────────────────┘
+
+BEST PRACTICES CHECKLIST:
+
+□ Use getByRole(), getByLabel() instead of selectors
+□ Prefer fill() over pressSequentially()
+□ Avoid { force: true }
+□ Wait for actionability explicitly if needed
+□ Use meaningful test descriptions
+□ Separate test setup from verification
+□ Handle dynamic content with waitForFunction()
+□ Test actual user workflows
+□ Verify success state, not just action completion
+□ Keep tests focused and independent
+

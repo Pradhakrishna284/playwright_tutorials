@@ -1,0 +1,1783 @@
+================================================================================
+PLAYWRIGHT ARCHITECTURE & DESIGN - COMPLETE GUIDE
+Tutorial: 15_Playwright_Architecture_Complete_Guide.txt
+================================================================================
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. Architecture Overview
+   1.1 Client-Server-Browser Architecture (Detailed)
+2. Core Components
+3. Layer Architecture
+4. Data Flow Through Architecture
+5. Test Runner Architecture
+6. Browser Automation Architecture
+7. API Communication Patterns
+8. Example: pw_xpath.spec.ts Through Architecture
+9. Design Patterns
+10. Performance Architecture
+
+================================================================================
+SECTION 1: ARCHITECTURE OVERVIEW
+================================================================================
+
+WHAT IS PLAYWRIGHT ARCHITECTURE?
+
+Playwright is a sophisticated test automation framework with multiple layers
+of abstraction and components working in concert.
+
+HIGH-LEVEL VIEW:
+
+    ┌──────────────────────────────────────────────────────────────┐
+    │                    User (Test Code)                          │
+    │              npx playwright test pw_xpath.spec.ts           │
+    └────────────────────────┬─────────────────────────────────────┘
+                             │
+    ┌────────────────────────▼─────────────────────────────────────┐
+    │              PLAYWRIGHT TEST RUNNER                          │
+    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+    │  │ Config      │  │ Test        │  │ Worker      │         │
+    │  │ Loader      │  │ Discovery   │  │ Manager     │         │
+    │  └─────────────┘  └─────────────┘  └─────────────┘         │
+    └────────────────────────┬─────────────────────────────────────┘
+                             │
+    ┌────────────────────────▼─────────────────────────────────────┐
+    │              PLAYWRIGHT API LAYER                            │
+    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+    │  │ Page API    │  │ Locator     │  │ Assertions  │         │
+    │  │             │  │ Engine      │  │             │         │
+    │  └─────────────┘  └─────────────┘  └─────────────┘         │
+    └────────────────────────┬─────────────────────────────────────┘
+                             │
+    ┌────────────────────────▼─────────────────────────────────────┐
+    │         BROWSER AUTOMATION LAYER (Protocol)                  │
+    │  ┌─────────────────────────────────────────────────────────┐ │
+    │  │  Chrome DevTools Protocol (CDP) / WebSocket             │ │
+    │  │  Communication to Browser Instance                       │ │
+    │  └─────────────────────────────────────────────────────────┘ │
+    └────────────────────────┬─────────────────────────────────────┘
+                             │
+    ┌────────────────────────▼─────────────────────────────────────┐
+    │         BROWSER INSTANCE (Chromium/Firefox/WebKit)           │
+    │  ┌─────────────────────────────────────────────────────────┐ │
+    │  │  Browser Process → Pages → DOM → JavaScript Engine     │ │
+    │  └─────────────────────────────────────────────────────────┘ │
+    └──────────────────────────────────────────────────────────────┘
+                             │
+    ┌────────────────────────▼─────────────────────────────────────┐
+    │              WEBSITE UNDER TEST (SUT)                        │
+    │  ┌─────────────────────────────────────────────────────────┐ │
+    │  │  demowebshop.tricentis.com / demo.nopcommerce.com      │ │
+    │  └─────────────────────────────────────────────────────────┘ │
+    └──────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+SECTION 1.1: CLIENT-SERVER-BROWSER ARCHITECTURE (DETAILED)
+================================================================================
+
+PLAYWRIGHT FOLLOWS A CLIENT-SERVER-BROWSER PATTERN:
+
+THREE-TIER ARCHITECTURE:
+
+Tier 1: CLIENT (Your Test Code)
+───────────────────────────────
+    Location: Your machine, Node.js process
+    Runs: Your test file (pw_xpath.spec.ts)
+    Writes: High-level Playwright API calls
+    
+    Example:
+        const link = page.locator('//a[@class="product"]');
+        await link.click();
+    
+    Characteristics:
+        ├─ Simple, readable syntax
+        ├─ No direct browser access
+        ├─ Communicates via WebSocket
+        ├─ Waits for server responses
+        └─ Unaware of protocol details
+
+
+Tier 2: SERVER (Playwright Automation Server)
+───────────────────────────────────────────────
+    Location: Same machine, or remote (headless cloud)
+    Function: Bridge between client and browser
+    Communicates: Via WebSocket connection
+    
+    Responsibilities:
+        ├─ Receive API calls from client
+        ├─ Convert to CDP protocol messages
+        ├─ Send commands to browser
+        ├─ Receive events from browser
+        ├─ Convert responses back to JavaScript
+        ├─ Handle retries and timeouts
+        └─ Manage browser lifecycle
+    
+    Not visible in your code - you never interact directly with it
+
+
+Tier 3: BROWSER (Actual Browser Process)
+──────────────────────────────────────────
+    Location: Separate system process
+    Executable: chrome.exe, firefox.exe, playwright-webkit, etc.
+    Function: Execute automation commands
+    
+    Capabilities:
+        ├─ Parse HTML/CSS/JavaScript
+        ├─ Render pages
+        ├─ Execute JavaScript
+        ├─ Simulate user input
+        ├─ Network requests
+        └─ Send back results
+
+
+ARCHITECTURE DIAGRAM (Detailed):
+
+    ┌────────────────────────────────────────────────────────────┐
+    │ YOUR MACHINE / YOUR ENVIRONMENT                            │
+    │                                                             │
+    │  ┌────────────────────────────────────────────────────┐    │
+    │  │ Node.js Process (Test Runner)                      │    │
+    │  │ ┌──────────────────────────────────────────────┐  │    │
+    │  │ │ TIER 1: CLIENT (Your Test Code)             │  │    │
+    │  │ │                                               │  │    │
+    │  │ │ test('should click link', async ({page}) => {│  │    │
+    │  │ │   await page.goto('https://example.com');   │  │    │
+    │  │ │   await page.click('//a[@href]');           │  │    │
+    │  │ │ });                                           │  │    │
+    │  │ └──────────────────────────────────────────────┘  │    │
+    │  │ ┌──────────────────────────────────────────────┐  │    │
+    │  │ │ TIER 2: SERVER (Playwright Automation)      │  │    │
+    │  │ │                                               │  │    │
+    │  │ │ - Protocol Translator                         │  │    │
+    │  │ │ - CDP Command Converter                       │  │    │
+    │  │ │ - WebSocket Handler                           │  │    │
+    │  │ │ - Event Processor                             │  │    │
+    │  │ └──────────────────────────────────────────────┘  │    │
+    │  └────────────────────────────────────────────────────┘    │
+    │                            │                                 │
+    │                            │ WebSocket Connection            │
+    │                            │ ws://localhost:52613/...        │
+    │                            │ (Full-duplex, persistent)       │
+    │                            ▼                                 │
+    │  ┌────────────────────────────────────────────────────┐    │
+    │  │ TIER 3: BROWSER (Separate Process)                │    │
+    │  │ ┌──────────────────────────────────────────────┐  │    │
+    │  │ │ Browser Engine (Chromium/Firefox/WebKit)    │  │    │
+    │  │ │                                               │  │    │
+    │  │ │ - Receives CDP protocol messages             │  │    │
+    │  │ │ - Parses/renders web content                 │  │    │
+    │  │ │ - Executes JavaScript                        │  │    │
+    │  │ │ - Simulates user interactions                │  │    │
+    │  │ │ - Sends events/results back                  │  │    │
+    │  │ │ - Manages network requests                   │  │    │
+    │  │ └──────────────────────────────────────────────┘  │    │
+    │  └────────────────────────────────────────────────────┘    │
+    │                            │                                 │
+    │                            ▼                                 │
+    │                   ┌─────────────────┐                        │
+    │                   │ HTTP/HTTPS      │                        │
+    │                   │ Requests to     │                        │
+    │                   │ Website Under   │                        │
+    │                   │ Test            │                        │
+    │                   └─────────────────┘                        │
+    └────────────────────────────────────────────────────────────┘
+
+
+COMMUNICATION FLOW EXAMPLE:
+
+Step 1: Client Code Execution
+    test code → await page.click('#button')
+    
+Step 2: Client Prepares
+    - Parse selector '#button'
+    - Create Locator object
+    - Prepare click action
+    
+Step 3: Client → Server Communication
+    Send over WebSocket:
+    {
+      "id": 42,
+      "method": "DOM.querySelector",
+      "params": { "selector": "#button" }
+    }
+    
+Step 4: Server Processing
+    - Receive JSON message
+    - Validate protocol
+    - Create CDP command
+    - Forward to browser
+    
+Step 5: Server → Browser Communication
+    Send CDP protocol message:
+    {
+      "id": 42,
+      "method": "Input.dispatchMouseEvent",
+      "params": { "type": "mousePressed", "x": 100, "y": 50 }
+    }
+    
+Step 6: Browser Execution
+    - Parse CDP message
+    - Find element (#button)
+    - Simulate mouse press at coordinates
+    - Trigger click event
+    - Execute onclick handlers
+    
+Step 7: Browser → Server Communication
+    Send response:
+    {
+      "id": 42,
+      "result": {}
+    }
+    
+Step 8: Server → Client Communication
+    Forward response over WebSocket
+    JavaScript promise resolves
+    
+Step 9: Test Code Continues
+    Next line in test executes
+    console.log('Button clicked')
+
+
+KEY SEPARATION PRINCIPLE:
+
+┌─────────────────────────────────────────────────────┐
+│ CLIENT (Your Code)      │ What you see              │
+│                         │ ├─ Simple API             │
+│                         │ ├─ Clean syntax           │
+│                         │ └─ Readable test code     │
+├─────────────────────────────────────────────────────┤
+│ SERVER (Playwright)     │ What you don't see        │
+│                         │ ├─ Protocol details       │
+│                         │ ├─ Network handling       │
+│                         │ ├─ Error recovery         │
+│                         │ └─ Optimization           │
+├─────────────────────────────────────────────────────┤
+│ BROWSER (Engine)        │ What actually executes    │
+│                         │ ├─ DOM manipulation       │
+│                         │ ├─ JavaScript execution   │
+│                         │ ├─ Network requests       │
+│                         │ └─ Rendering              │
+└─────────────────────────────────────────────────────┘
+
+
+BENEFITS OF THIS ARCHITECTURE:
+
+1. ABSTRACTION
+   └─ Users write simple code, complexity hidden in server
+
+2. CROSS-BROWSER SUPPORT
+   └─ Same client code, different browser processes
+   └─ Server abstracts browser-specific details
+
+3. REMOTE EXECUTION
+   └─ Browser can run on different machine
+   └─ Server bridges the gap via WebSocket
+
+4. SCALABILITY
+   └─ Multiple clients can control multiple browsers
+   └─ Server manages connections and state
+
+5. MAINTAINABILITY
+   └─ Clear separation of concerns
+   └─ Changes to protocol don't affect client code
+
+6. RELIABILITY
+   └─ Server can retry failed operations
+   └─ Network issues handled transparently
+   └─ Timeout management at server level
+
+
+================================================================================
+SECTION 2: CORE COMPONENTS
+================================================================================
+
+COMPONENT 1: TEST RUNNER
+───────────────────────
+
+Responsibility: Orchestrate test execution
+
+Sub-components:
+  ├─ CLI Parser
+  │  └─ Parses command-line arguments
+  │     Example: npx playwright test pw_xpath.spec.ts
+  │
+  ├─ Config Loader
+  │  └─ Loads and validates playwright.config.ts
+  │     ├─ testDir: './tests'
+  │     ├─ workers: undefined (auto-detect)
+  │     ├─ timeout: 30000
+  │     └─ baseURL: 'https://demo.nopcommerce.com'
+  │
+  ├─ Test Discovery Engine
+  │  └─ Scans directories, finds and parses test files
+  │     ├─ File pattern: **/*.spec.ts
+  │     ├─ Excludes: **/example.spec.ts
+  │     └─ Builds test registry
+  │
+  ├─ Worker Manager
+  │  └─ Creates and manages worker processes
+  │     ├─ Spawns: 6 workers (auto-detected)
+  │     ├─ Manages: Worker pool
+  │     ├─ Distributes: Tests to workers
+  │     └─ Collects: Results from workers
+  │
+  ├─ Reporter System
+  │  └─ Generates test reports
+  │     ├─ Console output
+  │     ├─ HTML report
+  │     ├─ JSON results
+  │     └─ Timing data
+  │
+  └─ Result Aggregator
+     └─ Combines results from all workers
+        ├─ Pass/Fail summary
+        ├─ Timing statistics
+        └─ Exit code determination
+
+
+COMPONENT 2: API LAYER
+──────────────────────
+
+Responsibility: Provide user-facing test API
+
+Sub-components:
+  ├─ Browser API
+  │  └─ Launch and manage browser instances
+  │     const browser = await playwright.chromium.launch();
+  │
+  ├─ Context API
+  │  └─ Create isolated browser contexts
+  │     const context = await browser.newContext();
+  │
+  ├─ Page API
+  │  └─ Interact with web pages
+  │     const page = await context.newPage();
+  │     await page.goto('https://demowebshop.tricentis.com/');
+  │
+  ├─ Locator API
+  │  └─ Find and interact with elements
+  │     const link = page.locator('//a[@class="product"]');
+  │     await link.click();
+  │
+  ├─ Network API
+  │  └─ Intercept and modify network requests
+  │     await page.route('**/*.css', route => route.abort());
+  │
+  ├─ Keyboard API
+  │  └─ Send keyboard input
+  │     await page.keyboard.press('Enter');
+  │
+  ├─ Mouse API
+  │  └─ Send mouse input
+  │     await page.mouse.click(100, 200);
+  │
+  └─ Assertion API
+     └─ Test assertions
+        await expect(page.locator('#element')).toBeVisible();
+
+
+COMPONENT 3: LOCATOR ENGINE
+────────────────────────────
+
+Responsibility: Element selection and querying
+
+Sub-components:
+  ├─ CSS Selector Engine
+  │  └─ Parse and execute CSS selectors
+  │     Example: page.locator('.product-link')
+  │
+  ├─ XPath Engine
+  │  └─ Parse and execute XPath expressions
+  │     Example: page.locator('//a[@class="product"]')
+  │
+  ├─ Text Matcher
+  │  └─ Find elements by text content
+  │     Example: page.locator('text=Products')
+  │
+  ├─ Role Matcher
+  │  └─ Find elements by accessibility role
+  │     Example: page.locator('[role="button"]')
+  │
+  ├─ Test ID Matcher
+  │  └─ Find elements by test ID attribute
+  │     Example: page.locator('[data-testid="submit"]')
+  │
+  └─ Composite Locator
+     └─ Chain multiple locators
+        Example: page.locator('#form').locator('button:first')
+
+
+COMPONENT 4: BROWSER AUTOMATION
+────────────────────────────────
+
+Responsibility: Communicate with browser via protocol
+
+Sub-components:
+  ├─ CDP Client (Chrome DevTools Protocol)
+  │  └─ WebSocket connection to browser
+  │     ├─ Sends commands: page navigation, clicks, etc.
+  │     ├─ Receives events: page loaded, element found, etc.
+  │     └─ Binary communication format
+  │
+  ├─ Command Executor
+  │  └─ Translates high-level API calls to CDP commands
+  │     Input: page.click('#button')
+  │     Output: CDP message to browser
+  │
+  ├─ Event Handler
+  │  └─ Processes browser events
+  │     ├─ Page lifecycle events
+  │     ├─ Navigation events
+  │     ├─ Console messages
+  │     └─ Network events
+  │
+  └─ Waiter System
+     └─ Wait for conditions
+        ├─ Wait for navigation
+        ├─ Wait for element
+        ├─ Wait for timeout
+        └─ Wait for function
+
+
+COMPONENT 5: FIXTURE SYSTEM
+────────────────────────────
+
+Responsibility: Provide reusable test setup/teardown
+
+Sub-components:
+  ├─ Built-in Fixtures
+  │  ├─ page: Browser page instance
+  │  ├─ browser: Browser instance
+  │  ├─ browserName: 'chromium' | 'firefox' | 'webkit'
+  │  ├─ context: Browser context
+  │  └─ request: HTTP API client
+  │
+  ├─ Custom Fixtures
+  │  └─ User-defined setup/teardown
+  │     const test = base.extend({
+  │       testUser: async ({}, use) => {
+  │         // Setup
+  │         const user = await createUser();
+  │         await use(user);
+  │         // Teardown
+  │         await deleteUser(user.id);
+  │       },
+  │     });
+  │
+  └─ Fixture Dependency Resolver
+     └─ Manages fixture dependencies and scoping
+
+
+COMPONENT 6: PROJECT SYSTEM
+────────────────────────────
+
+Responsibility: Run tests across multiple configurations
+
+Sub-components:
+  ├─ Project Loader
+  │  └─ Load project configurations
+  │     Example: chromium, firefox, webkit
+  │
+  ├─ Device Emulator
+  │  └─ Emulate mobile devices
+  │     Example: 'Pixel 5', 'iPhone 12'
+  │
+  └─ Configuration Merger
+     └─ Merge project config with global config
+
+
+================================================================================
+SECTION 3: LAYER ARCHITECTURE
+================================================================================
+
+PLAYWRIGHT IS ORGANIZED IN LAYERS:
+
+┌───────────────────────────────────────────────────────┐
+│ LAYER 0: USER CODE LAYER                              │
+│ ─────────────────────────────────────────────────────  │
+│ Your test file: pw_xpath.spec.ts                      │
+│                                                        │
+│ test('XPath locators', async ({page}) => {            │
+│   await page.goto('https://demo...');                 │
+│   const link = page.locator('//a');                   │
+│ });                                                    │
+└───────────────────────────────────────────────────────┘
+                        ↓
+┌───────────────────────────────────────────────────────┐
+│ LAYER 1: PUBLIC API LAYER                             │
+│ ─────────────────────────────────────────────────────  │
+│ High-level, user-friendly APIs                        │
+│ ├─ page.goto(), page.click(), page.fill()            │
+│ ├─ page.locator(), page.locatorFor()                 │
+│ ├─ expect() assertions                                │
+│ └─ keyboard, mouse, network APIs                      │
+│                                                        │
+│ What's exposed: await page.locator('//a').click()    │
+│ What's hidden: Protocol details, optimization        │
+└───────────────────────────────────────────────────────┘
+                        ↓
+┌───────────────────────────────────────────────────────┐
+│ LAYER 2: PROTOCOL ADAPTATION LAYER                    │
+│ ─────────────────────────────────────────────────────  │
+│ Translates API calls to CDP (Chrome DevTools         │
+│ Protocol) messages                                     │
+│                                                        │
+│ Input: page.click('#button')                          │
+│ Process:                                               │
+│ ├─ Resolve locator '#button'                          │
+│ ├─ Find element in DOM                                │
+│ ├─ Create CDP message                                 │
+│ └─ Send to browser                                    │
+│ Output: CDP command via WebSocket                     │
+└───────────────────────────────────────────────────────┘
+                        ↓
+┌───────────────────────────────────────────────────────┐
+│ LAYER 3: COMMUNICATION LAYER                          │
+│ ─────────────────────────────────────────────────────  │
+│ Low-level protocol communication                       │
+│                                                        │
+│ ├─ WebSocket connection management                    │
+│ ├─ Message serialization/deserialization              │
+│ ├─ Request/response matching                          │
+│ ├─ Error handling                                      │
+│ └─ Timeout management                                 │
+│                                                        │
+│ Technology: WebSocket + JSON-RPC protocol             │
+│                                                        │
+│ WEBSOCKET DETAILS:                                    │
+│ ├─ Connection Type: Full-duplex (bi-directional)     │
+│ ├─ Protocol: ws:// or wss:// (over TCP)              │
+│ ├─ Location: Between Node.js process and Browser     │
+│ ├─ Example: ws://localhost:52613/devtools/browser/   │
+│ ├─ Port: Dynamically allocated (usually 52xxx)       │
+│ └─ Why WebSocket?:                                    │
+│    ├─ Persistent connection (not HTTP req/resp)       │
+│    ├─ Real-time bi-directional communication         │
+│    ├─ Browser can send events anytime                 │
+│    ├─ Efficient for continuous automation             │
+│    └─ Lower latency than polling                      │
+└───────────────────────────────────────────────────────┘
+                        ↓
+┌───────────────────────────────────────────────────────┐
+│ LAYER 4: BROWSER INSTANCE LAYER                       │
+│ ─────────────────────────────────────────────────────  │
+│ Actual browser process (Chromium/Firefox/WebKit)     │
+│                                                        │
+│ ├─ Browser process                                    │
+│ ├─ Browser contexts                                   │
+│ ├─ Pages/tabs                                         │
+│ ├─ DOM tree                                           │
+│ ├─ JavaScript engine                                  │
+│ └─ Network stack                                      │
+│                                                        │
+│ Actual program: chrome.exe, firefox.exe, etc.         │
+└───────────────────────────────────────────────────────┘
+                        ↓
+┌───────────────────────────────────────────────────────┐
+│ LAYER 5: WEBSITE LAYER                                │
+│ ─────────────────────────────────────────────────────  │
+│ The application being tested                          │
+│                                                        │
+│ https://demowebshop.tricentis.com/                    │
+│ https://demo.nopcommerce.com/                         │
+└───────────────────────────────────────────────────────┘
+
+
+KEY PRINCIPLES:
+
+1. ABSTRACTION
+   ├─ High-level API hides protocol complexity
+   └─ Users write clean test code
+
+2. SEPARATION OF CONCERNS
+   ├─ Each layer has specific responsibility
+   └─ Changes don't cascade across layers
+
+3. TESTABILITY
+   ├─ Each layer can be tested independently
+   └─ Mocking at each boundary is possible
+
+4. PERFORMANCE
+   ├─ Protocol optimization at lower layers
+   └─ Caching and batching where possible
+
+5. MAINTAINABILITY
+   ├─ Clear component boundaries
+   └─ Easy to understand data flow
+
+
+================================================================================
+SECTION 4: DATA FLOW THROUGH ARCHITECTURE
+================================================================================
+
+EXAMPLE: User clicks a button with page.locator('//a').click()
+
+STEP 1: USER CODE → PUBLIC API
+───────────────────────────────
+
+Input code:
+    const link = page.locator('//a[@class="product-link"]');
+    await link.click();
+
+Processing:
+    1. page.locator() is called
+       └─ Returns a Locator object (not executed yet)
+    
+    2. locator.click() is called
+       └─ NOW execution begins
+
+Data structure created:
+    Locator {
+      selector: '//a[@class="product-link"]',
+      selectorType: 'xpath',
+      timeout: 5000,
+      strict: false
+    }
+
+
+STEP 2: PUBLIC API → LOCATOR ENGINE
+─────────────────────────────────────
+
+Input: Locator object with XPath selector
+
+Processing in Locator Engine:
+    1. Parse XPath expression
+       └─ '//a[@class="product-link"]'
+    
+    2. Create query plan
+       └─ XPath engine execution plan
+    
+    3. Execute in browser context
+       └─ JavaScript code to evaluate XPath
+
+Generated JavaScript:
+    (function() {
+      const evaluator = new XPathEvaluator();
+      const result = evaluator.evaluate(
+        '//a[@class="product-link"]',
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      return result.singleNodeValue;
+    })();
+
+Output: Element reference (if found)
+
+
+STEP 3: LOCATOR ENGINE → PROTOCOL ADAPTATION
+───────────────────────────────────────────────
+
+Input: Element reference + action (click)
+
+Processing:
+    1. Check if element is visible
+       └─ Verify clickable
+    
+    2. Get element coordinates
+       └─ X, Y position
+    
+    3. Create CDP command
+       └─ Input.dispatchMouseEvent
+
+Generated CDP message:
+    {
+      method: 'Input.dispatchMouseEvent',
+      params: {
+        type: 'mousePressed',
+        x: 342,
+        y: 158,
+        button: 'left',
+        clickCount: 1
+      }
+    }
+
+
+STEP 4: PROTOCOL ADAPTATION → COMMUNICATION (WEBSOCKET)
+─────────────────────────────────────────────────────────
+
+Input: CDP command object
+
+Processing in Communication Layer:
+    1. Serialize CDP command to JSON
+    2. Wrap in JSON-RPC envelope with message ID
+    3. Create protocol frame
+    4. Send over WebSocket connection
+
+WEBSOCKET CONNECTION DETAILS:
+
+Location in Architecture:
+    ┌─────────────────────────────────────┐
+    │  YOUR TEST CODE (Node.js Process)   │
+    │  Running in Terminal/IDE            │
+    └────────┬────────────────────────────┘
+             │
+             │ WebSocket Connection
+             │ (ws://localhost:52613/...)
+             │
+    ┌────────▼────────────────────────────┐
+    │  BROWSER PROCESS                    │
+    │  (Chromium/Firefox/WebKit)          │
+    │  Separate executable process        │
+    └─────────────────────────────────────┘
+
+Connection Initialization:
+    1. When browser launches, it opens debug port
+    2. Playwright connects via WebSocket
+    3. Connection stays open throughout test
+    4. Closed when browser closes
+
+Example WebSocket URL:
+    ws://localhost:52613/devtools/browser/xxxxx
+
+Message Structure (JSON-RPC):
+    {
+      "id": 42,
+      "method": "Input.dispatchMouseEvent",
+      "params": {
+        "type": "mousePressed",
+        "x": 342,
+        "y": 158,
+        "button": "left",
+        "clickCount": 1
+      }
+    }
+
+Message Flow Over WebSocket:
+
+    Your Code                WebSocket Bridge        Browser
+        │                          │                    │
+        │  Ready to click         │                    │
+        ├─ Create CDP message ───>│                    │
+        │  id: 42                 │ Connect if needed  │
+        │                         ├─ ws:// connection │
+        │                         │<──────────────────┤
+        │                         │ WebSocket open    │
+        │                         │                    │
+        │  Send click command    │                    │
+        │  (JSON over WS)        │                    │
+        ├────────────────────────>│ Convert JSON       │
+        │  {id:42, method:...}   ├───────────────────>│
+        │                         │ Parse protocol    │
+        │                         │ Simulate click    │
+        │                         │ Generate events   │
+        │                         │<───────────────────┤
+        │                         │ Return result     │
+        │  Response received      │ (JSON)            │
+        │<─────────────────────────┤                    │
+        │  {id: 42, result: {}}   │                    │
+        │                         │                    │
+        │ Match by ID            │                    │
+        │ Resolve promise        │                    │
+        ▼                         ▼                    ▼
+
+Transmitted message:
+    {
+      "id": 42,
+      "method": "Input.dispatchMouseEvent",
+      "params": {
+        "type": "mousePressed",
+        "x": 342,
+        "y": 158,
+        "button": "left",
+        "clickCount": 1
+      }
+    }
+
+Network Path:
+    Chrome DevTools Protocol (CDP) Message
+            ↓
+    JSON-RPC Format
+            ↓
+    WebSocket Frame (binary)
+            ↓
+    TCP/IP Transmission
+            ↓
+    Browser Process
+            ↓
+    Protocol Handler
+            ↓
+    Execute Command
+
+
+WHY WEBSOCKET FOR BROWSER AUTOMATION:
+
+Without WebSocket (Using HTTP):
+    ❌ Request-Response pattern only
+    ❌ Browser cannot initiate messages
+    ❌ Polling needed for events
+    ❌ High latency for real-time control
+
+With WebSocket:
+    ✅ Bi-directional communication
+    ✅ Browser sends events anytime
+    ✅ Instant message delivery
+    ✅ Persistent connection
+    ✅ Low latency automation
+    ✅ Efficient for continuous interaction
+
+
+WEBSOCKET MESSAGE TYPES:
+
+1. Command Messages (Test Code → Browser):
+    {
+      "id": 42,
+      "method": "Page.navigate",
+      "params": { "url": "https://example.com" }
+    }
+
+2. Response Messages (Browser → Test Code):
+    {
+      "id": 42,
+      "result": { "frameId": "xxx" }
+    }
+
+3. Event Messages (Browser → Test Code, unsolicited):
+    {
+      "method": "Page.frameNavigated",
+      "params": { "frame": {...} }
+    }
+
+4. Error Messages (Browser → Test Code):
+    {
+      "id": 42,
+      "error": {
+        "code": -32700,
+        "message": "Parse error"
+      }
+    }
+
+
+STEP 5: COMMUNICATION → BROWSER INSTANCE
+──────────────────────────────────────────
+
+Browser receives message:
+    1. Parse protocol message
+    2. Route to correct handler
+       └─ Input handler
+    
+    3. Execute command
+       └─ Simulate mouse click at (342, 158)
+    
+    4. Generate events
+       ├─ mousedown
+       ├─ mouseup
+       ├─ click
+       └─ Any handlers triggered
+    
+    5. Update DOM if needed
+    
+    6. Send response back
+
+
+STEP 6: BROWSER INSTANCE → WEBSITE
+───────────────────────────────────
+
+Browser executes:
+    1. Mouse events trigger JavaScript handlers
+    2. onClick handler executes
+    3. Navigation might occur
+    4. DOM updated
+    5. Page rendered
+
+
+STEP 7: WEBSITE → BROWSER INSTANCE
+───────────────────────────────────
+
+Website responds:
+    1. Server receives request
+    2. Sends response
+    3. Browser receives and processes
+    4. Sends completion event back to Playwright
+
+
+STEP 8: BROWSER INSTANCE → COMMUNICATION
+──────────────────────────────────────────
+
+Browser sends response:
+    {
+      "id": 42,
+      "result": {}
+    }
+
+Or if navigation occurred, sends:
+    {
+      "method": "Page.frameNavigated",
+      "params": {...}
+    }
+
+
+STEP 9: COMMUNICATION → PROTOCOL ADAPTATION
+────────────────────────────────────────────
+
+Response received:
+    1. Parse message
+    2. Match to original request (id: 42)
+    3. Extract result
+    4. Check for errors
+    5. Resolve promise
+
+
+STEP 10: PROTOCOL ADAPTATION → PUBLIC API
+────────────────────────────────────────────
+
+Promise resolves:
+    └─ await link.click() completes
+
+Back in user code:
+    const link = page.locator('//a[@class="product-link"]');
+    await link.click();  // ← NOW completed
+    console.log('Click done');  // ← Executes next
+
+
+FULL DATA FLOW DIAGRAM:
+
+    User Code
+        ↓
+    await link.click()
+        ↓
+    Public API Layer
+        ↓
+    Locator.click() method
+        ↓
+    Locator Engine
+        ↓
+    Evaluate XPath expression
+        ↓
+    Create click command
+        ↓
+    Protocol Adaptation Layer
+        ↓
+    Convert to CDP message
+        ↓
+    Communication Layer
+        ↓
+    Serialize and send via WebSocket
+        ↓
+    Browser Instance
+        ↓
+    Parse CDP message
+        ↓
+    Simulate mouse click
+        ↓
+    Trigger click handlers
+        ↓
+    Website JavaScript executes
+        ↓
+    DOM updated
+        ↓
+    Response sent back
+        ↓
+    Communication Layer
+        ↓
+    Parse response
+        ↓
+    Protocol Adaptation Layer
+        ↓
+    Resolve promise
+        ↓
+    Public API Layer
+        ↓
+    User Code continues
+        ↓
+    console.log('Click done')
+
+Total time: ~200-500ms (depending on network/server)
+
+
+================================================================================
+SECTION 5: TEST RUNNER ARCHITECTURE
+================================================================================
+
+TEST RUNNER ORCHESTRATES EVERYTHING:
+
+┌──────────────────────────────────────────────────┐
+│         MAIN PROCESS (Test Runner)               │
+├──────────────────────────────────────────────────┤
+│ Responsibilities:                                │
+│ ├─ Load configuration                           │
+│ ├─ Discover tests                               │
+│ ├─ Create worker pool                           │
+│ ├─ Distribute tests                             │
+│ ├─ Aggregate results                            │
+│ └─ Generate reports                             │
+└──────────────────────────────────────────────────┘
+        ↓        ↓        ↓        ↓
+    ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+    │Worker 1│ │Worker 2│ │Worker 3│ │Worker 4│
+    ├────────┤ ├────────┤ ├────────┤ ├────────┤
+    │Browser │ │Browser │ │Browser │ │Browser │
+    │Instance│ │Instance│ │Instance│ │Instance│
+    └────────┘ └────────┘ └────────┘ └────────┘
+
+
+ARCHITECTURE OF SINGLE WORKER:
+
+┌────────────────────────────────────────┐
+│       WORKER PROCESS                   │
+├────────────────────────────────────────┤
+│ ┌──────────────────────────────────┐  │
+│ │  Browser Manager                 │  │
+│ │  ├─ Launch browser               │  │
+│ │  ├─ Create context               │  │
+│ │  ├─ Create page                  │  │
+│ │  └─ Cleanup                      │  │
+│ └──────────────────────────────────┘  │
+│         ↓                              │
+│ ┌──────────────────────────────────┐  │
+│ │  Test Executor                   │  │
+│ │  ├─ Load test file               │  │
+│ │  ├─ Run hooks (before/after)     │  │
+│ │  ├─ Execute test code            │  │
+│ │  ├─ Capture errors               │  │
+│ │  └─ Record results               │  │
+│ └──────────────────────────────────┘  │
+│         ↓                              │
+│ ┌──────────────────────────────────┐  │
+│ │  Assertion Engine                │  │
+│ │  ├─ Evaluate expect()            │  │
+│ │  ├─ Check conditions             │  │
+│ │  └─ Report failures              │  │
+│ └──────────────────────────────────┘  │
+│         ↓                              │
+│ ┌──────────────────────────────────┐  │
+│ │  Result Recorder                 │  │
+│ │  ├─ Success/failure              │  │
+│ │  ├─ Duration                     │  │
+│ │  ├─ Screenshots                  │  │
+│ │  ├─ Videos                       │  │
+│ │  └─ Traces                       │  │
+│ └──────────────────────────────────┘  │
+└────────────────────────────────────────┘
+
+
+TEST EXECUTION FLOW IN WORKER:
+
+1. Worker receives test assignment
+   From: Main process
+   Message: {test: 'XPath locators - introduction', file: 'pw_xpath.spec.ts'}
+
+2. Browser Manager launches browser
+   └─ Chromium process starts
+
+3. Test file is loaded and compiled
+   └─ TypeScript → JavaScript
+
+4. beforeAll hooks execute (if any)
+   └─ Fixture setup
+
+5. Test code executes
+   └─ await page.goto(...)
+   └─ const locator = page.locator('...')
+   └─ assertions
+
+6. afterAll hooks execute
+   └─ Fixture cleanup
+
+7. Results packaged
+   {
+     status: 'PASSED',
+     duration: 1200,
+     name: 'XPath locators - introduction',
+     file: 'pw_xpath.spec.ts',
+     errors: [],
+     attachments: [screenshots, videos]
+   }
+
+8. Results sent back to main process
+   └─ IPC message
+
+9. Worker waits for next test assignment
+   └─ Loop back to step 1
+
+
+================================================================================
+SECTION 6: BROWSER AUTOMATION ARCHITECTURE
+================================================================================
+
+HOW PLAYWRIGHT AUTOMATES BROWSERS:
+
+┌────────────────────────────────────────┐
+│   PLAYWRIGHT (Node.js Process)         │
+├────────────────────────────────────────┤
+│ ┌──────────────────────────────────┐  │
+│ │  Playwright Client               │  │
+│ │  (JavaScript/TypeScript API)     │  │
+│ └──────────────────────────────────┘  │
+│         ↓ WebSocket                    │
+├────────────────────────────────────────┤
+│  Chrome DevTools Protocol (CDP)       │
+│  - Page control                        │
+│  - Network interception                │
+│  - JavaScript evaluation               │
+│  - DOM access                          │
+└────────────────────────────────────────┘
+         ↓ WebSocket
+┌────────────────────────────────────────┐
+│   BROWSER PROCESS (Chromium)           │
+├────────────────────────────────────────┤
+│ ┌──────────────────────────────────┐  │
+│ │  Browser Engine                  │  │
+│ │  ├─ Process management           │  │
+│ │  ├─ Context isolation            │  │
+│ │  └─ Tab/page management          │  │
+│ └──────────────────────────────────┘  │
+│         ↓                              │
+│ ┌──────────────────────────────────┐  │
+│ │  Page (Tab)                      │  │
+│ │  ├─ DOM tree                     │  │
+│ │  ├─ JavaScript engine (V8)       │  │
+│ │  ├─ Layout engine                │  │
+│ │  ├─ Rendering engine             │  │
+│ │  └─ Network stack                │  │
+│ └──────────────────────────────────┘  │
+└────────────────────────────────────────┘
+         ↓ HTTP/HTTPS
+┌────────────────────────────────────────┐
+│   WEBSITE (Website Under Test)         │
+├────────────────────────────────────────┤
+│ Server responding to requests          │
+└────────────────────────────────────────┘
+
+
+CHROME DEVTOOLS PROTOCOL (CDP) ARCHITECTURE:
+
+CDP is the underlying protocol. It's a JSON-RPC protocol over WebSocket.
+
+Message Types:
+
+1. COMMAND (Main Process → Browser)
+   Purpose: Instruct browser to do something
+   
+   Example:
+   {
+     "id": 1,
+     "method": "Page.navigate",
+     "params": {
+       "url": "https://example.com"
+     }
+   }
+
+2. RESULT (Browser → Main Process)
+   Purpose: Response to command
+   
+   Example:
+   {
+     "id": 1,
+     "result": {
+       "frameId": "ABC123"
+     }
+   }
+
+3. EVENT (Browser → Main Process)
+   Purpose: Browser notifies about something that happened
+   
+   Example:
+   {
+     "method": "Page.loadEventFired",
+     "params": {
+       "timestamp": 1234567890
+     }
+   }
+
+
+CDP DOMAINS (Functional areas):
+
+   ├─ Page: Page navigation, lifecycle
+   ├─ DOM: DOM access and modification
+   ├─ Runtime: JavaScript execution
+   ├─ Network: Network interception
+   ├─ Input: Keyboard, mouse, touch
+   ├─ Debugger: Breakpoints, debugging
+   ├─ Profiler: Performance profiling
+   ├─ Security: Certificate handling
+   ├─ Storage: Cookies, storage
+   └─ Target: Tab/context management
+
+
+COMMAND FLOW EXAMPLE (page.goto):
+
+await page.goto('https://example.com');
+
+1. Playwright receives goto() call
+2. Creates CDP command:
+   {
+     "id": 1,
+     "method": "Page.navigate",
+     "params": {
+       "url": "https://example.com"
+     }
+   }
+
+3. Sends over WebSocket to browser
+
+4. Browser receives and routes to Page domain
+
+5. Browser initiates HTTP request to example.com
+
+6. Server responds with HTML
+
+7. Browser parses HTML, creates DOM
+
+8. Browser loads subresources (CSS, JS, images)
+
+9. When page is loaded, browser sends event:
+   {
+     "method": "Page.loadEventFired",
+     "params": {...}
+   }
+
+10. Playwright receives event
+
+11. Waits for network to settle (no more requests)
+
+12. Promise from goto() resolves
+
+13. User code continues
+
+
+================================================================================
+SECTION 7: API COMMUNICATION PATTERNS
+================================================================================
+
+PLAYWRIGHT USES SEVERAL COMMUNICATION PATTERNS:
+
+PATTERN 1: REQUEST-RESPONSE (Synchronous wait)
+───────────────────────────────────────────────
+
+await page.goto('https://example.com');
+
+Execution:
+    1. Send: Page.navigate command
+    2. Wait: For response from browser
+    3. Receive: Page.loadEventFired event
+    4. Resolve: Promise returns
+    5. Continue: Next line executes
+
+Diagram:
+    Main Process                    Browser
+    ────────────                    ───────
+    goto() called
+         ↓
+    Send: Page.navigate ───────────→ Received
+         ↓                           ↓
+    Wait for response               Navigate
+    (blocked)                       ↓
+         ↓                          Send: loadEventFired
+    ← ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ Received
+    Promise resolves
+         ↓
+    Continue execution
+
+
+PATTERN 2: FIRE-AND-FORGET (With callback)
+────────────────────────────────────────────
+
+page.on('console', msg => console.log(msg));
+
+Execution:
+    1. Register listener
+    2. Forget about it
+    3. Whenever browser sends console event, callback fires
+    4. No blocking
+
+Diagram:
+    Main Process                    Browser
+    ────────────                    ───────
+    page.on('console', callback)
+         ↓
+    Continue execution immediately
+    (listener registered)
+         ↓
+         ↓                          Browser executes JS
+         ↓                          ↓
+         ↓                          console.log() called
+         ↓                          ↓
+         ↓                   Send: Runtime.consoleAPICalled
+         ←─ ─ ─ ─ ─ ─ ─ ─ ─ Received
+         ↓
+    callback() executes
+
+
+PATTERN 3: BATCH OPERATIONS (Collect and send)
+────────────────────────────────────────────────
+
+Optimization: Instead of sending one command per operation,
+batch multiple operations and send in one message.
+
+const results = await Promise.all([
+  page.locator('#btn1').click(),
+  page.locator('#btn2').click(),
+  page.locator('#btn3').click()
+]);
+
+Execution:
+    1. All three click operations prepared
+    2. Batched together
+    3. Sent to browser in optimized manner
+    4. Results collected
+    5. All promises resolve
+
+
+PATTERN 4: EVENT STREAMING (Continuous flow)
+──────────────────────────────────────────────
+
+page.on('framenavigated', frame => {
+  console.log('Frame navigated:', frame.url);
+});
+
+Execution:
+    1. Listener registered
+    2. Browser sends events continuously
+    3. Each event triggers callback
+    4. No request-response cycle
+    5. Continuous monitoring
+
+
+================================================================================
+SECTION 8: EXAMPLE - pw_xpath.spec.ts THROUGH ARCHITECTURE
+================================================================================
+
+TRACKING A SINGLE TEST EXECUTION THROUGH THE ARCHITECTURE:
+
+Test code:
+    test('XPath locators - introduction', async ({page}) => {
+      await page.goto('https://demowebshop.tricentis.com/');
+      const link = page.locator('//a[@class="product-link"]');
+      const count = await link.count();
+      console.log(`Found ${count} product links`);
+      await expect(link.first()).toBeVisible();
+    });
+
+
+EXECUTION TRACE:
+
+STAGE 1: DISCOVERY
+──────────────────
+[Test Runner] Scans tests/
+[Test Runner] Finds pw_xpath.spec.ts
+[Test Runner] Parses file
+[Test Runner] Discovers test: "XPath locators - introduction"
+[Test Runner] Adds to queue
+
+
+STAGE 2: DISTRIBUTION
+──────────────────────
+[Main Process] Has 6 workers ready
+[Main Process] Has 17 tests in queue
+[Main Process] Assigns test to Worker 1
+[Main Process] Sends message:
+  {
+    test: 'XPath locators - introduction',
+    file: 'pw_xpath.spec.ts',
+    config: {...}
+  }
+
+
+STAGE 3: WORKER INITIALIZATION
+───────────────────────────────
+[Worker 1] Receives test assignment
+[Worker 1] Launches Chromium browser
+[Worker 1] Creates browser context
+[Worker 1] Creates new page
+[Worker 1] Loads test file
+[Worker 1] Resolves fixtures: {page: <Page>}
+[Worker 1] Ready to execute test
+
+
+STAGE 4: TEST EXECUTION
+────────────────────────
+
+Line 1: await page.goto('https://demowebshop.tricentis.com/');
+
+[API Layer] goto() called
+[API Layer] Create navigation command
+[Protocol Layer] Convert to CDP:
+  {
+    "id": 1,
+    "method": "Page.navigate",
+    "params": {
+      "url": "https://demowebshop.tricentis.com/"
+    }
+  }
+[Communication] Send via WebSocket to Chromium
+[Browser] Receive navigate command
+[Browser] Start HTTP request to server
+[Server] Respond with HTML
+[Browser] Parse HTML, create DOM
+[Browser] Load CSS, JS, images
+[Browser] Send Page.loadEventFired event
+[Communication] Receive event
+[API Layer] Resolve promise
+[Test Execution] Continue to next line
+
+
+Line 2: const link = page.locator('//a[@class="product-link"]');
+
+[Locator Engine] Create Locator object
+  {
+    selector: '//a[@class="product-link"]',
+    type: 'xpath'
+  }
+[Locator Engine] Return Locator (not executed yet)
+[Test Execution] link variable assigned
+
+
+Line 3: const count = await link.count();
+
+[API Layer] count() called on Locator
+[Locator Engine] Prepare to find elements
+[Protocol Layer] Create JavaScript to evaluate XPath:
+  {
+    "id": 2,
+    "method": "Runtime.evaluate",
+    "params": {
+      "expression": "
+        (function() {
+          const xpathResult = document.evaluate(
+            '//a[@class=\"product-link\"]',
+            document,
+            null,
+            XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+            null
+          );
+          return xpathResult.snapshotLength;
+        })()
+      "
+    }
+  }
+[Communication] Send via WebSocket
+[Browser] Receive Runtime.evaluate
+[Browser] Execute JavaScript in page context
+[Browser] Evaluate XPath expression
+[Browser] Result: 42 matching elements
+[Browser] Send result:
+  {
+    "id": 2,
+    "result": {
+      "value": 42
+    }
+  }
+[Communication] Receive result
+[API Layer] Extract value: 42
+[Test Execution] count = 42
+
+
+Line 4: console.log(`Found ${count} product links`);
+
+[JavaScript] Execute console.log
+[Output] "Found 42 product links"
+
+
+Line 5: await expect(link.first()).toBeVisible();
+
+[Assertion Engine] link.first()
+  └─ Create locator for first matching element
+
+[Assertion Engine] toBeVisible()
+  └─ Check visibility condition
+
+[Protocol Layer] Create command to check visibility:
+  {
+    "id": 3,
+    "method": "Runtime.evaluate",
+    "params": {
+      "expression": "
+        (function() {
+          const xpathResult = document.evaluate(
+            '//a[@class=\"product-link\"]',
+            document,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+          );
+          const element = xpathResult.singleNodeValue;
+          return {
+            visible: element.offsetParent !== null,
+            clientRect: element.getBoundingClientRect()
+          };
+        })()
+      "
+    }
+  }
+[Communication] Send to browser
+[Browser] Execute check
+[Browser] Element is visible: true
+[Browser] Send result
+[Assertion Engine] Assert: visible === true
+[Result] ✓ PASS
+
+
+STAGE 5: CLEANUP
+────────────────
+[Worker 1] Test complete
+[Worker 1] Close browser context
+[Worker 1] Browser cleanup
+[Worker 1] Package results:
+  {
+    name: 'XPath locators - introduction',
+    status: 'PASSED',
+    duration: 1200,
+    errors: [],
+    attachments: []
+  }
+[Worker 1] Send results to Main Process
+[Main Process] Receive results
+[Main Process] Record test result
+[Main Process] Assign next test to Worker 1
+
+
+STAGE 6: REPORTING
+──────────────────
+[Main Process] Wait for all tests to complete
+[Main Process] Aggregate results:
+  ├─ Total: 17
+  ├─ Passed: 17
+  ├─ Failed: 0
+[Main Process] Generate HTML report
+[Main Process] Display console output:
+  ✓ [chromium] › tests/pw_xpath.spec.ts (1200ms)
+
+
+================================================================================
+SECTION 9: DESIGN PATTERNS USED
+================================================================================
+
+PATTERN 1: ABSTRACTION LAYERS
+──────────────────────────────
+
+Problem: Browsers have complex protocol (CDP), users need simple API
+Solution: Create abstraction layers
+
+User code:     await page.click('#button')
+API layer:     page.click() → find element → validate
+Locator layer: Resolve selector to element
+Protocol layer: Convert to CDP command
+Communication:  Send CDP message
+Browser:       Execute command
+
+
+PATTERN 2: BUILDER PATTERN
+───────────────────────────
+
+Example: Launching browser with options
+
+const browser = await chromium.launch({
+  headless: false,
+  slowMo: 100,
+  devtools: true
+});
+
+Creates browser with fluent options, building configuration step-by-step.
+
+
+PATTERN 3: FIXTURES (DEPENDENCY INJECTION)
+────────────────────────────────────────────
+
+test.extend({
+  testUser: async ({}, use) => {
+    const user = await createUser();
+    await use(user);
+    await deleteUser(user.id);
+  }
+});
+
+Provides dependencies to tests, managing setup/teardown.
+
+
+PATTERN 4: EVENT EMITTER
+─────────────────────────
+
+page.on('popup', popup => {
+  console.log('New popup:', popup.url());
+});
+
+Objects emit events, listeners can react.
+
+
+PATTERN 5: PROMISE-BASED ASYNC
+────────────────────────────────
+
+const result = await page.evaluate('2 + 2');
+
+All async operations return promises, enabling async/await syntax.
+
+
+PATTERN 6: COMPOSITE PATTERN (Locators)
+────────────────────────────────────────
+
+const firstButton = page
+  .locator('form')
+  .locator('button')
+  .first();
+
+Chain locators for complex element selection.
+
+
+PATTERN 7: COMMAND PATTERN (CDP)
+────────────────────────────────
+
+Each API call is converted to a CDP command, which is a specific action
+with parameters.
+
+
+================================================================================
+SECTION 10: PERFORMANCE ARCHITECTURE
+================================================================================
+
+HOW PLAYWRIGHT OPTIMIZES PERFORMANCE:
+
+OPTIMIZATION 1: PARALLEL EXECUTION
+──────────────────────────────────
+
+Multiple workers run tests simultaneously:
+  ├─ Worker 1: Test 1
+  ├─ Worker 2: Test 2
+  ├─ Worker 3: Test 3
+  └─ Results in 3-6x speedup
+
+
+OPTIMIZATION 2: BATCHING OPERATIONS
+────────────────────────────────────
+
+Instead of:
+  await page.click('#a');
+  await page.click('#b');
+  await page.click('#c');
+  (3 round trips)
+
+Use:
+  await Promise.all([
+    page.click('#a'),
+    page.click('#b'),
+    page.click('#c')
+  ]);
+  (1 optimized batch)
+
+
+OPTIMIZATION 3: ELEMENT CACHING
+────────────────────────────────
+
+Locators are evaluated lazily and results may be cached:
+  const button = page.locator('button');
+  await button.click();    // Evaluates selector
+  await button.click();    // May use cached reference
+
+
+OPTIMIZATION 4: NETWORK OPTIMIZATION
+─────────────────────────────────────
+
+Can intercept and block unnecessary resources:
+  await page.route('**/*.png', route => route.abort());
+  (Saves bandwidth, speeds up pages)
+
+
+OPTIMIZATION 5: HEADLESS MODE
+──────────────────────────────
+
+Default: headless: true
+  ├─ No GUI overhead
+  ├─ Faster execution
+  └─ Perfect for CI/CD
+
+Debug: headless: false
+  ├─ See browser
+  ├─ Slower
+  └─ For manual debugging
+
+
+OPTIMIZATION 6: CONTEXT ISOLATION
+──────────────────────────────────
+
+Each worker has own browser context:
+  ├─ Isolated cookies
+  ├─ Isolated storage
+  ├─ Isolated DOM
+  └─ No test interference
+
+
+MEMORY ARCHITECTURE:
+
+Per worker (6 workers = ~2.7GB):
+  ├─ Chromium process: ~400MB
+  ├─ Context data: ~30MB
+  ├─ Page DOM tree: ~20MB (depends on size)
+  └─ Other: ~50MB
+
+
+CPU USAGE DURING EXECUTION:
+
+┌─────────────────────────────┐
+│         CPU Usage           │
+├─────────────────────────────┤
+│ 100% │   ████████           │
+│      │   ████████           │
+│ 50%  │   ████████           │
+│      │   ████████           │
+│ 0%   └───────────────       │
+│      0    2    4    6       │
+│         Time (seconds)      │
+│                             │
+│ Peak: 80-100% (6 workers)   │
+│ Average: 70% (heavy tasks)  │
+└─────────────────────────────┘
+
+
+================================================================================
+SUMMARY OF ARCHITECTURE
+================================================================================
+
+PLAYWRIGHT ARCHITECTURE CONSISTS OF:
+
+1. TEST RUNNER LAYER
+   └─ Manages test lifecycle, worker pool, result aggregation
+
+2. PUBLIC API LAYER
+   └─ High-level, user-friendly test APIs
+
+3. LOCATOR ENGINE
+   └─ Resolves CSS, XPath, text, role selectors
+
+4. PROTOCOL ADAPTATION LAYER
+   └─ Converts API calls to CDP messages
+
+5. COMMUNICATION LAYER
+   └─ WebSocket management, message serialization
+
+6. BROWSER AUTOMATION LAYER
+   └─ Chrome DevTools Protocol (CDP) interface
+
+7. BROWSER INSTANCE
+   └─ Actual Chromium/Firefox/WebKit process
+
+8. WEBSITE UNDER TEST
+   └─ The application being tested
+
+
+KEY PRINCIPLES:
+
+✓ LAYERED ARCHITECTURE: Each layer has specific responsibility
+✓ ABSTRACTION: High-level API hides complexity
+✓ PARALLELIZATION: Multiple workers for speed
+✓ COMMUNICATION: WebSocket-based CDP protocol
+✓ ISOLATION: Tests don't interfere with each other
+✓ OPTIMIZATION: Caching, batching, headless mode
+✓ FLEXIBILITY: Supports Chromium, Firefox, WebKit
+
+
+================================================================================
+END OF TUTORIAL
+================================================================================
+
+Document version: 1.0
+Last updated: December 2025
+Complexity: Advanced
+
+Recommended reading order:
+1. This document (architecture overview)
+2. 14_Test_Execution_Lifecycle_And_Flow_Complete_Guide.txt (execution details)
+3. 07_Workers_And_Parallelization_Complete_Guide.txt (parallelization)
+4. 01_Fundamentals_Complete_Guide.txt (basics)

@@ -1,0 +1,314 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    PLAYWRIGHT ACTIONS - QUICK REFERENCE CARD                 ║
+║                                                                                ║
+║                   Print this and keep it at your desk!                        ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─ THE MOST IMPORTANT RULE ───────────────────────────────────────────────────┐
+│                                                                               │
+│  IS IT A FORM INPUT? (<input>, <textarea>, <select>)                         │
+│    └─ YES  → Use inputValue()                                                │
+│    └─ NO   → Use textContent()                                               │
+│                                                                               │
+│  Using the wrong method = Silent test failures with empty/null values!       │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ TEXT INPUT ACTIONS                                                            ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  fill(text)                     Clear field and type text (RECOMMENDED)      ║
+║    await input.fill('hello');                                                ║
+║    Best for: Normal form filling                                             ║
+║                                                                               ║
+║  pressSequentially(text, {delay})  Type char-by-char (slower)               ║
+║    await field.pressSequentially('test', {delay: 100});                     ║
+║    Best for: Testing autocomplete, input handlers                            ║
+║                                                                               ║
+║  type(text)                     Type method (alternative)                    ║
+║    await field.type('hello');                                                ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ INTERACTION ACTIONS                                                           ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  click()                        Single left click (MOST COMMON)              ║
+║    await button.click();                                                     ║
+║                                                                               ║
+║  dblclick()                     Double click                                 ║
+║    await element.dblclick();                                                 ║
+║                                                                               ║
+║  click({button: 'right'})       Right-click (context menu)                  ║
+║    await element.click({button: 'right'});                                  ║
+║                                                                               ║
+║  check()                        Select checkbox/radio                        ║
+║    await checkbox.check();                                                   ║
+║                                                                               ║
+║  uncheck()                      Deselect checkbox                            ║
+║    await checkbox.uncheck();                                                 ║
+║                                                                               ║
+║  selectOption(value)            Select dropdown option                       ║
+║    await select.selectOption('value');                                       ║
+║    await select.selectOption({label: 'Label Text'});                         ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ VALUE RETRIEVAL ACTIONS                                                       ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  inputValue()                   Get form input value (FOR INPUTS ONLY)       ║
+║    const val = await input.inputValue();                                     ║
+║    Returns: "entered text" or null                                           ║
+║    ✓ For: <input>, <textarea>, <select>                                      ║
+║    ✗ For: <button>, <div>, <span>, etc. (returns null)                       ║
+║                                                                               ║
+║  textContent()                  Get element text (FOR ANY ELEMENT)           ║
+║    const text = await button.textContent();                                  ║
+║    Returns: "displayed text" or empty string                                 ║
+║    ✓ For: <button>, <div>, <span>, <a>, etc.                                 ║
+║    ✗ For: <input> (returns empty string)                                     ║
+║                                                                               ║
+║  getAttribute(name)             Get HTML attribute value                     ║
+║    const type = await input.getAttribute('type');                            ║
+║    const maxlen = await input.getAttribute('maxlength');                     ║
+║    const dataTest = await el.getAttribute('data-testid');                    ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ KEYBOARD ACTIONS                                                              ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  press(key)                     Press keyboard key                           ║
+║    await field.press('Enter');                                               ║
+║    await field.press('Backspace');                                           ║
+║    await field.press('Control+a');  // Select all                            ║
+║    await field.press('Control+c');  // Copy                                  ║
+║    await field.press('Control+v');  // Paste                                 ║
+║                                                                               ║
+║  pressSequentially(text)        Type with keyboard events (see above)        ║
+║                                                                               ║
+║  Key Names:                                                                  ║
+║    Special: 'Enter', 'Escape', 'Backspace', 'Delete', 'Tab', 'Space'        ║
+║    Nav: 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'                    ║
+║    Page: 'PageUp', 'PageDown', 'Home', 'End'                                 ║
+║    Modifiers: 'Control+', 'Shift+', 'Alt+', 'Meta+'                          ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ FOCUS/HOVER ACTIONS                                                           ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  focus()                        Set focus on element                         ║
+║    await field.focus();                                                      ║
+║    Use for: Testing focus-dependent behavior                                 ║
+║                                                                               ║
+║  blur()                         Remove focus from element                    ║
+║    await field.blur();                                                       ║
+║    Use for: Testing form validation on blur                                  ║
+║                                                                               ║
+║  hover()                        Move mouse over element                      ║
+║    await button.hover();                                                     ║
+║    Use for: Showing tooltips, opening dropdowns                              ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ SCROLL ACTIONS                                                                ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  scrollIntoViewIfNeeded()       Scroll element into view if needed           ║
+║    await element.scrollIntoViewIfNeeded();                                    ║
+║    Note: Most actions do this automatically                                  ║
+║                                                                               ║
+║  page.evaluate()                Custom scroll with JavaScript                ║
+║    await page.evaluate(() => window.scrollBy(0, 500));                       ║
+║    await page.evaluate(() => window.scrollTo(0, 1000));                      ║
+║                                                                               ║
+║  page.mouse.wheel()             Mouse wheel scroll                           ║
+║    await page.mouse.wheel(0, 500);  // Scroll down                           ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ FILE/DRAG ACTIONS                                                             ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  setInputFiles(path)            Upload file(s)                               ║
+║    await fileInput.setInputFiles('./file.pdf');                              ║
+║    await fileInput.setInputFiles(['./file1.pdf', './file2.pdf']);            ║
+║    await fileInput.setInputFiles([]); // Clear files                         ║
+║                                                                               ║
+║  dragTo(target)                 Drag element to target                       ║
+║    await source.dragTo(target);                                              ║
+║    Use for: Testing reorder, Kanban, drag-drop                               ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ ASSERTION METHODS                                                             ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  toBeVisible()                  Assert element is visible                    ║
+║    await expect(element).toBeVisible();                                      ║
+║                                                                               ║
+║  toBeEnabled()                  Assert element is enabled                    ║
+║    await expect(button).toBeEnabled();                                       ║
+║                                                                               ║
+║  toBeChecked()                  Assert checkbox/radio is checked             ║
+║    await expect(checkbox).toBeChecked();                                     ║
+║                                                                               ║
+║  toHaveValue(value)             Assert input has value                       ║
+║    await expect(input).toHaveValue('text');                                  ║
+║                                                                               ║
+║  toHaveText(text)               Assert element has text                      ║
+║    await expect(button).toHaveText('Click Me');                              ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─ FILL() VS pressSequentially() ──────────────────────────────────────────────┐
+│                                                                               │
+│  fill()                         pressSequentially()                          │
+│  ─────────────────────────────  ─────────────────────────────────────────    │
+│  Fast                           Slow (character by character)                 │
+│  Clears field first             Doesn't clear                                │
+│  1 input event                  Keydown/up for each char                    │
+│  Use 90% of time                Use only when testing handlers              │
+│                                                                               │
+│  CHOOSE fill() UNLESS you're testing autocomplete/validation handlers       │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ COMMON PATTERNS ───────────────────────────────────────────────────────────┐
+│                                                                               │
+│  FILL FORM:                                                                  │
+│    await form.locator('#name').fill('John');                                │
+│    await form.locator('#email').fill('john@example.com');                   │
+│    await form.locator('#password').fill('pass123');                         │
+│    await form.locator('button[type="submit"]').click();                     │
+│                                                                               │
+│  VERIFY FORM VALUE:                                                          │
+│    const name = await form.locator('#name').inputValue();                   │
+│    expect(name).toBe('John');                                                │
+│                                                                               │
+│  SELECT DROPDOWN:                                                            │
+│    await form.locator('#country').selectOption('US');                       │
+│    const selected = await form.locator('#country').inputValue();             │
+│    expect(selected).toBe('US');                                              │
+│                                                                               │
+│  CHECK CHECKBOX:                                                             │
+│    await form.locator('#accept').check();                                    │
+│    await expect(form.locator('#accept')).toBeChecked();                      │
+│                                                                               │
+│  TEST FOCUS VALIDATION:                                                      │
+│    await field.focus();                                                      │
+│    await field.fill('invalid');                                              │
+│    await field.blur();                                                       │
+│    await expect(page.locator('.error')).toBeVisible();                       │
+│                                                                               │
+│  HOVER AND CHECK TOOLTIP:                                                    │
+│    await button.hover();                                                     │
+│    await expect(page.locator('.tooltip')).toBeVisible();                     │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ COMMON MISTAKES TO AVOID ──────────────────────────────────────────────────┐
+│                                                                               │
+│  ✗ WRONG: const val = await input.textContent();                            │
+│  ✓ RIGHT: const val = await input.inputValue();                             │
+│                                                                               │
+│  ✗ WRONG: const txt = await button.inputValue();                            │
+│  ✓ RIGHT: const txt = await button.textContent();                           │
+│                                                                               │
+│  ✗ WRONG: await field.pressSequentially('email@test.com', {delay: 100});   │
+│  ✓ RIGHT: await field.fill('email@test.com');  // Much faster               │
+│                                                                               │
+│  ✗ WRONG: await button.click();  // No visibility check                      │
+│  ✓ RIGHT: await expect(button).toBeVisible();                               │
+│           await button.click();                                              │
+│                                                                               │
+│  ✗ WRONG: await select.textContent();  // Gets ALL option text              │
+│  ✓ RIGHT: await select.inputValue();   // Gets selected VALUE               │
+│                                                                               │
+│  ✗ WRONG: const initialVal = await field.getAttribute('value');             │
+│  ✓ RIGHT: const currentVal = await field.inputValue();                      │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─ WHEN TO USE EACH METHOD ──────────────────────────────────────────────────┐
+│                                                                               │
+│  Need to...                         Use this...                             │
+│  ─────────────────────────────────  ────────────────────────────────────    │
+│  Enter text in form field           fill() or pressSequentially()           │
+│  Get value from input field         inputValue()                            │
+│  Get text from button               textContent()                           │
+│  Get text from any element          textContent()                           │
+│  Click button/link                  click()                                 │
+│  Select checkbox/radio              check() / uncheck()                     │
+│  Select dropdown option             selectOption()                          │
+│  Press keyboard key                 press()                                 │
+│  Type slowly for handler            pressSequentially()                     │
+│  Set focus on element               focus()                                 │
+│  Test blur validation               blur()                                  │
+│  Show tooltip/dropdown              hover()                                 │
+│  Upload file                        setInputFiles()                         │
+│  Drag element                       dragTo()                                │
+│  Scroll to element                  scrollIntoViewIfNeeded()                │
+│  Get HTML attribute                 getAttribute()                          │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║ QUICK DEBUG CHECKLIST                                                         ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  Test fails with empty/null value:                                           ║
+║    □ Am I using inputValue() for form inputs only?                          ║
+║    □ Am I using textContent() for other elements?                           ║
+║                                                                               ║
+║  Test fails with "element not found":                                        ║
+║    □ Is the locator selector correct?                                        ║
+║    □ Is the element actually present in DOM?                                 ║
+║    □ Do I need to wait for element?                                         ║
+║                                                                               ║
+║  Test fails with "element is not actionable":                                ║
+║    □ Is element visible? await expect().toBeVisible()                       ║
+║    □ Is element enabled? await expect().toBeEnabled()                       ║
+║    □ Is element covered by overlay?                                         ║
+║                                                                               ║
+║  Test times out:                                                             ║
+║    □ Is the action waiting for something?                                    ║
+║    □ Do I need explicit wait? waitForSelector()                             ║
+║    □ Is selector correct?                                                    ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+ADDITIONAL RESOURCES:
+  → Playwright API: https://playwright.dev/docs/api/class-locator
+  → Main Guide: tutorials/19_Actions_Complete_Guide.txt
+  → Tests: tests/pw_actions_handling_html_elements.spec.ts
+  → Examples: tutorials/21_Actions_Practical_Examples.txt
+
+═══════════════════════════════════════════════════════════════════════════════════

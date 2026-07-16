@@ -1,0 +1,836 @@
+================================================================================
+PLAYWRIGHT LOCATORS - COMPLETE GUIDE
+================================================================================
+Source: https://playwright.dev/docs/locators
+Date: December 28, 2025
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. Introduction to Locators
+2. When and Why to Use await
+3. Built-in Locator Methods (Priority Order)
+4. Locating Elements - Detailed Guide
+5. Shadow DOM Support
+6. Filtering Locators
+7. Locator Operators
+8. Working with Lists
+9. Strictness Mode
+10. Best Practices
+
+================================================================================
+1. INTRODUCTION TO LOCATORS
+================================================================================
+
+What are Locators?
+------------------
+Locators are the central piece of Playwright's auto-waiting and retry-ability.
+They represent a way to find element(s) on the page at any moment.
+
+Key Characteristics:
+• Locators are LAZY - they don't find elements until an action is performed
+• Auto-waiting - Playwright waits for elements to be actionable
+• Auto-retry - Automatically retries if element is not ready
+• Up-to-date - Every action locates the element fresh from the DOM
+
+Dynamic Element Location:
+-------------------------
+const locator = page.getByRole('button', { name: 'Sign in' });
+await locator.hover();  // Locates element before hover
+await locator.click();  // Locates element again before click
+
+This means if the DOM changes between calls (due to re-render), the new element
+corresponding to the locator will be used.
+
+Why Locators are Lazy:
+----------------------
+• Element is NOT found when you create the locator
+• Element is found ONLY when you perform an action
+• This allows Playwright to:
+  - Wait for element to appear
+  - Retry if element is not ready
+  - Find fresh element every time (handles dynamic content)
+
+Example of Lazy Behavior:
+const button = page.getByRole('button');  // NO search happens here (no await)
+await button.click();                      // NOW it searches and clicks
+
+
+================================================================================
+2. WHEN AND WHY TO USE await
+================================================================================
+
+CRITICAL RULE: Locators are synchronous, Actions are asynchronous
+
+✓ USE await for ACTIONS (they return Promises):
+------------------------------------------------
+await page.getByRole('button').click()           // Click action
+await page.getByLabel('Email').fill('test@x.com') // Fill action
+await page.getByRole('checkbox').check()         // Check action
+await page.getByText('Submit').press('Enter')    // Press action
+await page.getByPlaceholder('Search').clear()    // Clear action
+await page.getByAltText('Logo').hover()          // Hover action
+
+✓ USE await for ASSERTIONS (they return Promises):
+---------------------------------------------------
+await expect(page.getByText('Success')).toBeVisible()
+await expect(page.getByRole('heading')).toHaveText('Welcome')
+await expect(page.getByLabel('Email')).toBeEnabled()
+
+✓ USE await for GETTERS (they return Promises):
+------------------------------------------------
+const text = await page.getByText('Price').textContent()
+const value = await page.getByLabel('Email').inputValue()
+const count = await page.getByRole('listitem').count()
+const attr = await page.getByAltText('Logo').getAttribute('src')
+
+✗ DON'T use await when CREATING locators (they're lazy):
+---------------------------------------------------------
+const button = page.getByRole('button')          // NO await
+const email = page.getByLabel('Email')           // NO await
+const logo = page.getByAltText('Logo')           // NO await
+
+Why await is Needed for Actions:
+---------------------------------
+1. Actions are asynchronous operations (return Promises)
+2. Playwright needs to:
+   - Wait for element to be in DOM
+   - Wait for element to be visible
+   - Wait for element to be stable (not animating)
+   - Wait for element to be enabled
+   - Perform the action
+   - Wait for action to complete
+3. All this takes time, so it returns a Promise
+
+Auto-Waiting Checklist (happens automatically when you await):
+---------------------------------------------------------------
+✓ Element is attached to DOM
+✓ Element is visible
+✓ Element is stable (not animating)
+✓ Element is enabled (for buttons/inputs)
+✓ Element receives events (not covered by other elements)
+
+
+================================================================================
+3. BUILT-IN LOCATOR METHODS (PRIORITY ORDER)
+================================================================================
+
+Playwright provides these recommended built-in locators.
+Use them in this priority order for best results:
+
+1. page.getByRole() ⭐ MOST RECOMMENDED
+   - Locate by explicit and implicit accessibility attributes
+   - Most user-facing and recommended approach
+   - Tests accessibility compliance
+   
+   WHEN: Interactive elements (buttons, links, inputs, headings)
+   WHY: Reflects how users and screen readers perceive the page
+   
+2. page.getByLabel() ⭐ BEST FOR FORMS
+   - Locate form controls by associated label's text
+   - Best for form fields
+   
+   WHEN: Form inputs with <label> elements
+   WHY: Mirrors how users find form fields
+   
+3. page.getByPlaceholder()
+   - Locate inputs by placeholder attribute
+   - Use when labels are not available
+   
+   WHEN: Search boxes, inputs without labels
+   WHY: Placeholder is visible hint text to users
+
+4. page.getByText()
+   - Locate by text content
+   - Good for non-interactive elements
+   
+   WHEN: Divs, spans, paragraphs with text content
+   WHY: Text is what users see and read
+   
+5. page.getByAltText()
+   - Locate elements (usually images) by alt text
+   - Good for image elements
+   
+   WHEN: Images, areas with alt attributes
+   WHY: Alt text is required for accessibility
+
+6. page.getByTitle()
+   - Locate elements by title attribute
+   - Use when element has title attribute
+   
+   WHEN: Elements with tooltips, icon buttons
+   WHY: Title provides additional context
+
+7. page.getByTestId() ⭐ MOST RESILIENT
+   - Locate by data-testid attribute (configurable)
+   - Most resilient but not user-facing
+   
+   WHEN: Text/structure changes frequently, translations
+   WHY: Dedicated test attribute won't change
+   
+8. page.locator() ⚠️ LAST RESORT
+   - CSS or XPath selectors
+   - Not recommended as primary approach
+   
+   WHEN: Only when other methods don't work
+   WHY: Fragile, tied to DOM structure, breaks easily
+
+
+================================================================================
+4. LOCATING ELEMENTS - DETAILED GUIDE
+================================================================================
+
+4.1 LOCATE BY ROLE (Recommended - Primary Method)
+--------------------------------------------------
+
+WHEN TO USE:
+✓ Primary choice for ALL interactive elements
+✓ Ensuring accessibility compliance
+✓ Buttons, links, form controls, headings
+✓ Any element with ARIA role
+
+WHY USE THIS:
+• Closest to how users and assistive technology perceive the page
+• Follows W3C ARIA specifications
+• Reflects actual accessibility of your application
+• Most resilient to UI changes (text can change, role stays same)
+
+WHEN TO USE await:
+✓ await page.getByRole('button').click()        - Action needed
+✓ await expect(page.getByRole('heading')).toBeVisible() - Assertion
+✗ const button = page.getByRole('button')       - Just creating locator
+
+EXPLANATION:
+• Locates by ARIA role attribute (button, link, heading, textbox, etc.)
+• Can filter by accessible name (from label, text, or aria-label)
+• Role represents element's purpose/function
+• Common roles: button, link, textbox, checkbox, radio, heading, table, row
+
+Example DOM:
+<h3>Sign up</h3>
+<label>
+  <input type="checkbox" /> Subscribe
+</label>
+<br/>
+<button>Submit</button>
+
+Locating by Role:
+await expect(page.getByRole('heading', { name: 'Sign up' })).toBeVisible();
+await page.getByRole('checkbox', { name: 'Subscribe' }).check();
+await page.getByRole('button', { name: /submit/i }).click();
+
+Common ARIA Roles:
+• button, checkbox, radio, textbox
+• heading, link, list, listitem
+• table, row, cell, columnheader
+• dialog, alert, navigation, main
+• combobox, tab, tabpanel, menu, menuitem
+• And many more from W3C ARIA spec
+
+Role Options:
+{
+  name: 'Submit',           // Accessible name (exact or regex)
+  exact: true,              // Exact name match
+  checked: true,            // Checkbox/radio state
+  disabled: false,          // Element enabled state
+  expanded: true,           // Expandable element state
+  level: 2,                 // Heading level (1-6)
+  pressed: true,            // Toggle button state
+  selected: true            // Option/tab selected state
+}
+
+
+4.2 LOCATE BY LABEL (Form Controls)
+------------------------------------
+
+WHEN TO USE:
+✓ Locating form fields (input, select, textarea) with labels
+✓ Any input associated with a <label> element
+✓ Form validation and data entry
+
+WHY USE THIS:
+• Mirrors how users find form fields (by reading labels)
+• Ensures proper label-input association (accessibility requirement)
+• Label text is more stable than placeholder text
+• Works even if input is hidden in custom components
+
+WHEN TO USE await:
+✓ await page.getByLabel('Email').fill('test@example.com') - Action
+✓ await expect(page.getByLabel('Email')).toBeVisible()    - Assertion
+✗ const emailInput = page.getByLabel('Email')             - Creating locator
+
+EXPLANATION:
+• Locates form controls by their associated <label> element text
+• HTML associates labels via 'for' attribute or by wrapping
+• Supports nested labels and aria-labelledby attribute
+• Ensures accessibility (screen readers use labels)
+
+Example DOM:
+<label for="email">Email Address</label>
+<input id="email" type="email" />
+
+OR (wrapped label):
+<label>
+  Email Address
+  <input type="email" />
+</label>
+
+Usage:
+await page.getByLabel('Password').fill('secret');
+await page.getByLabel('Email Address').fill('user@example.com');
+await page.getByLabel('Newsletter', { exact: false }).check();
+
+
+4.3 LOCATE BY PLACEHOLDER
+--------------------------
+
+WHEN TO USE:
+✓ Form elements without visible labels
+✓ Search boxes and input fields
+✓ Modern UI designs that use placeholders instead of labels
+
+WHY USE THIS:
+• Some forms use placeholder instead of labels
+• Common in search boxes and minimal designs
+• Placeholder text is visible to users
+• Fallback when labels are not available
+
+WHEN TO USE await:
+✓ await page.getByPlaceholder('Search...').fill('laptop') - Action
+✓ await expect(page.getByPlaceholder('Email')).toBeVisible() - Assertion
+✗ const searchBox = page.getByPlaceholder('Search...')    - Creating locator
+
+EXPLANATION:
+• Locates input elements by their placeholder attribute
+• Placeholder is the hint text shown when input is empty
+• Only works with elements supporting placeholder (input, textarea)
+• Text disappears when user types
+
+For inputs with placeholder attributes.
+
+Example DOM:
+<input type="email" placeholder="name@example.com" />
+
+Usage:
+await page.getByPlaceholder('name@example.com').fill('playwright@microsoft.com');
+await page.getByPlaceholder(/search/i).fill('laptop');
+✓ Form elements without labels but with placeholders
+✓ Search boxes and input fields
+
+
+3.4 LOCATE BY TEXT
+-------------------
+
+Find elements by their text content.
+
+Example DOM:
+<span>Welcome, John</span>
+
+Usage:
+// Substring match
+await expect(page.getByText('Welcome, John')).toBeVisible();
+
+// Exact match
+await expect(page.getByText('Welcome, John', { exact: true })).toBeVisible();
+
+// Regular expression
+await expect(page.getByText(/welcome, [A-Za-z]+$/i)).toBeVisible();
+
+Important Notes:
+• Text matching always normalizes whitespace
+• Multiple spaces become one space
+• Line breaks become spaces
+• Leading/trailing whitespace is ignored
+
+When to Use:
+✓ Non-interactive elements (div, span, p)
+✗ Avoid for interactive elements - use getByRole instead
+✓ When filtering items in a list
+
+
+3.5 LOCATE BY ALT TEXT
+-----------------------
+
+For images and elements with alt attributes.
+
+Example DOM:
+<img alt="playwright logo" src="/img/playwright-logo.svg" width="100" />
+
+Usage:
+await page.getByAltText('playwright logo').click();
+
+When to Use:
+✓ Image elements (<img>)
+✓ Area elements (<area>)
+✓ Any element with alt text
+
+
+3.6 LOCATE BY TITLE
+--------------------
+
+Locate by title attribute.
+
+Example DOM:
+<span title='Issues count'>25 issues</span>
+
+Usage:
+await expect(page.getByTitle('Issues count')).toHaveText('25 issues');
+
+When to Use:
+✓ Elements with title attributes
+✓ Tooltips or informational elements
+
+
+3.7 LOCATE BY TEST ID (Most Resilient)
+---------------------------------------
+
+Most resilient way of testing - survives text and role changes.
+
+Example DOM:
+<button data-testid="directions">Itinéraire</button>
+
+Usage:
+await page.getByTestId('directions').click();
+
+Custom Test ID Attribute:
+Configure in playwright.config.ts:
+
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    testIdAttribute: 'data-pw'
+  }
+});
+
+Then in HTML:
+<button data-pw="directions">Itinéraire</button>
+
+When to Use:
+✓ When role or text values are important but may change
+✓ When you can't locate by role or text
+✓ For stable test automation
+✗ Not user-facing - prefer role/text when possible
+
+
+3.8 LOCATE BY CSS OR XPATH (Last Resort)
+-----------------------------------------
+
+Use only when other methods don't work.
+
+CSS Selector:
+await page.locator('css=button').click();
+await page.locator('button').click();  // Auto-detected as CSS
+
+XPath Selector:
+await page.locator('xpath=//button').click();
+await page.locator('//button').click();  // Auto-detected as XPath
+
+Why Not Recommended:
+✗ Tied to DOM structure
+✗ Break easily when DOM changes
+✗ Long selector chains are unstable
+✗ Not user-facing
+
+Bad Example (Fragile):
+await page.locator('#tsf > div:nth-child(2) > div.A8SBwf > div.RNNXgb > div > div.a4bIc > input').click();
+await page.locator('//*[@id="tsf"]/div[2]/div[1]/div[1]/div/div[2]/input').click();
+
+When to Use:
+✓ Only as a last resort
+✓ When no other locator method works
+✓ Try to combine with other methods if possible
+
+
+================================================================================
+4. LOCATE IN SHADOW DOM
+================================================================================
+
+All Playwright locators work with Shadow DOM by default (with exceptions).
+
+Exceptions:
+• XPath does not pierce shadow roots
+• Closed-mode shadow roots are not supported
+
+Example Custom Web Component:
+<x-details role=button aria-expanded=true aria-controls=inner-details>
+  <div>Title</div>
+  #shadow-root
+    <div id=inner-details>Details</div>
+</x-details>
+
+Usage (Shadow Root is Transparent):
+// Click inside shadow root
+await page.getByText('Details').click();
+
+// Click the custom element itself
+await page.locator('x-details', { hasText: 'Details' }).click();
+
+// Assert text in shadow root
+await expect(page.locator('x-details')).toContainText('Details');
+
+
+================================================================================
+5. FILTERING LOCATORS
+================================================================================
+
+Filter locators to narrow down to specific elements.
+
+5.1 FILTER BY TEXT
+------------------
+
+Example DOM:
+<ul>
+  <li>
+    <h3>Product 1</h3>
+    <button>Add to cart</button>
+  </li>
+  <li>
+    <h3>Product 2</h3>
+    <button>Add to cart</button>
+  </li>
+</ul>
+
+Filter by Substring:
+await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Product 2' })
+    .getByRole('button', { name: 'Add to cart' })
+    .click();
+
+Filter by Regular Expression:
+await page
+    .getByRole('listitem')
+    .filter({ hasText: /Product 2/ })
+    .getByRole('button', { name: 'Add to cart' })
+    .click();
+
+
+5.2 FILTER BY NOT HAVING TEXT
+------------------------------
+
+Filter out elements with specific text:
+
+// Get 5 in-stock items (excluding "Out of stock")
+await expect(page.getByRole('listitem').filter({ hasNotText: 'Out of stock' }))
+    .toHaveCount(5);
+
+
+5.3 FILTER BY CHILD/DESCENDANT
+-------------------------------
+
+Filter by presence of a descendant element:
+
+await page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { name: 'Product 2' }) })
+    .getByRole('button', { name: 'Add to cart' })
+    .click();
+
+Assert Count:
+await expect(page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { name: 'Product 2' }) }))
+    .toHaveCount(1);
+
+Important: Filtering Locator Must Be Relative
+The filtering locator starts from the original locator match, NOT document root.
+
+✓ CORRECT:
+await page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { name: 'Product 2' }) })
+
+✗ WRONG (starts from <ul> outside <li>):
+await page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('list').getByText('Product 2') })
+
+
+5.4 FILTER BY NOT HAVING CHILD/DESCENDANT
+------------------------------------------
+
+Filter out elements with specific descendants:
+
+await expect(page
+    .getByRole('listitem')
+    .filter({ hasNot: page.getByText('Product 2') }))
+    .toHaveCount(1);
+
+
+================================================================================
+6. LOCATOR OPERATORS
+================================================================================
+
+6.1 MATCHING INSIDE A LOCATOR (Chaining)
+-----------------------------------------
+
+Chain locator methods to narrow down search:
+
+const product = page.getByRole('listitem').filter({ hasText: 'Product 2' });
+
+await product.getByRole('button', { name: 'Add to cart' }).click();
+await expect(product).toHaveCount(1);
+
+Chaining Two Locators:
+const saveButton = page.getByRole('button', { name: 'Save' });
+const dialog = page.getByTestId('settings-dialog');
+
+await dialog.locator(saveButton).click();
+
+
+6.2 MATCHING TWO LOCATORS SIMULTANEOUSLY (.and())
+--------------------------------------------------
+
+Combine two locators - element must match BOTH:
+
+const button = page.getByRole('button').and(page.getByTitle('Subscribe'));
+
+This finds elements that are:
+• A button (by role)
+• AND have title "Subscribe"
+
+
+6.3 MATCHING ALTERNATIVE LOCATORS (.or())
+------------------------------------------
+
+Match one OR the other (or both):
+
+const newEmail = page.getByRole('button', { name: 'New' });
+const dialog = page.getByText('Confirm security settings');
+
+await expect(newEmail.or(dialog).first()).toBeVisible();
+
+if (await dialog.isVisible())
+  await page.getByRole('button', { name: 'Dismiss' }).click();
+
+await newEmail.click();
+
+Note: If both match, might throw strictness violation error.
+Use .first() to match only one.
+
+
+6.4 MATCHING ONLY VISIBLE ELEMENTS
+-----------------------------------
+
+Filter to only visible elements:
+
+Example DOM:
+<button style='display: none'>Invisible</button>
+<button>Visible</button>
+
+This throws strictness error (finds both):
+await page.locator('button').click();
+
+This works (finds only visible):
+await page.locator('button').filter({ visible: true }).click();
+
+Note: Better to find a more reliable unique identifier instead of using visibility.
+
+
+================================================================================
+7. WORKING WITH LISTS
+================================================================================
+
+7.1 COUNT ITEMS IN A LIST
+--------------------------
+
+<ul>
+  <li>apple</li>
+  <li>banana</li>
+  <li>orange</li>
+</ul>
+
+await expect(page.getByRole('listitem')).toHaveCount(3);
+
+
+7.2 ASSERT ALL TEXT IN A LIST
+------------------------------
+
+await expect(page.getByRole('listitem'))
+    .toHaveText(['apple', 'banana', 'orange']);
+
+
+7.3 GET A SPECIFIC ITEM
+
+Method 1 - Get by Text:
+await page.getByText('orange').click();
+
+Method 2 - Filter by Text:
+await page
+    .getByRole('listitem')
+    .filter({ hasText: 'orange' })
+    .click();
+
+Method 3 - Get by Test ID:
+<ul>
+  <li data-testid='apple'>apple</li>
+  <li data-testid='banana'>banana</li>
+  <li data-testid='orange'>orange</li>
+</ul>
+
+await page.getByTestId('orange').click();
+
+Method 4 - Get by nth Item:
+const banana = await page.getByRole('listitem').nth(1);
+
+⚠️ Use nth() with caution - page changes might make it point to wrong element.
+
+
+7.4 CHAINING FILTERS
+---------------------
+
+Complex filtering with multiple criteria:
+
+<ul>
+  <li>
+    <div>John</div>
+    <div><button>Say hello</button></div>
+  </li>
+  <li>
+    <div>Mary</div>
+    <div><button>Say hello</button></div>
+  </li>
+  <li>
+    <div>John</div>
+    <div><button>Say goodbye</button></div>
+  </li>
+  <li>
+    <div>Mary</div>
+    <div><button>Say goodbye</button></div>
+  </li>
+</ul>
+
+Get the row with "Mary" AND "Say goodbye":
+const rowLocator = page.getByRole('listitem');
+
+await rowLocator
+    .filter({ hasText: 'Mary' })
+    .filter({ has: page.getByRole('button', { name: 'Say goodbye' }) })
+    .screenshot({ path: 'screenshot.png' });
+
+
+7.5 RARE USE CASES
+
+Iterate Elements:
+for (const row of await page.getByRole('listitem').all())
+  console.log(await row.textContent());
+
+Iterate with For Loop:
+const rows = page.getByRole('listitem');
+const count = await rows.count();
+for (let i = 0; i < count; ++i)
+  console.log(await rows.nth(i).textContent());
+
+Evaluate in Page:
+const rows = page.getByRole('listitem');
+const texts = await rows.evaluateAll(
+    list => list.map(element => element.textContent)
+);
+
+
+================================================================================
+8. STRICTNESS MODE
+================================================================================
+
+What is Strictness?
+-------------------
+Locators are strict - operations on locators throw an exception if MORE than
+one element matches.
+
+Example - Throws Error (Multiple Matches):
+await page.getByRole('button').click();
+// Error: strict mode violation if multiple buttons exist
+
+Example - Works Fine (Multiple Elements):
+await page.getByRole('button').count();
+// count() is designed to work with multiple elements
+
+Opting Out of Strictness:
+You can explicitly choose which element when multiple match:
+
+• locator.first() - First matching element
+• locator.last() - Last matching element  
+• locator.nth(index) - Specific index
+
+⚠️ Not Recommended - These methods are fragile when page changes.
+Better: Create a unique locator using filters, role, text, etc.
+
+
+================================================================================
+9. BEST PRACTICES
+================================================================================
+
+9.1 LOCATOR PRIORITY (Recommended Order)
+-----------------------------------------
+
+1. getByRole() - Primary choice
+   ✓ User-facing
+   ✓ Ensures accessibility
+   ✓ Most resilient
+
+2. getByLabel() - For form controls
+   ✓ User-facing
+   ✓ Clear association
+
+3. getByPlaceholder() - When no label
+   ✓ User-facing
+   ✓ Common in modern UIs
+
+4. getByText() - For non-interactive elements
+   ✓ User-facing
+   ✓ Good for content verification
+
+5. getByTestId() - For resilient automation
+   ✓ Survives text/role changes
+   ✗ Not user-facing
+
+6. CSS/XPath - Last resort only
+   ✗ Fragile
+   ✗ Not user-facing
+
+
+9.2 CODE GENERATION
+--------------------
+
+Use the Playwright code generator to create locators:
+npx playwright codegen
+
+Then edit the generated locators as needed.
+
+
+9.3 LOCATOR REUSABILITY
+------------------------
+
+Store frequently used locators:
+
+const saveButton = page.getByRole('button', { name: 'Save' });
+await saveButton.click();
+await expect(saveButton).toBeDisabled();
+
+
+9.4 AVOID FRAGILE SELECTORS
+----------------------------
+
+✗ Bad (Fragile):
+page.locator('#root > div:nth-child(2) > div.container > button')
+
+✓ Good (Resilient):
+page.getByRole('button', { name: 'Submit' })
+
+
+9.5 USE CODE GENERATOR
+-----------------------
+
+Playwright's code generator helps you:
+• Discover best locators automatically
+• Learn locator patterns
+• Generate test code quickly
+
+Command:
+npx playwright codegen <url>
+
+
+================================================================================
+END OF LOCATORS COMPLETE GUIDE
+================================================================================

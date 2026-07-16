@@ -1,0 +1,2128 @@
+================================================================================
+    PLAYWRIGHT FUNDAMENTALS - PRACTICAL EXAMPLES
+================================================================================
+
+This document provides comprehensive, real-world examples covering all Playwright
+fundamentals topics. Each example includes complete, working code with detailed
+explanations.
+
+================================================================================
+    TABLE OF CONTENTS
+================================================================================
+
+1. PROJECT SETUP & INITIALIZATION
+2. CONFIGURATION PATTERNS
+3. TEST FILE ORGANIZATION
+4. CUSTOM FIXTURES
+5. AUTHENTICATION & SESSION MANAGEMENT
+6. PAGE OBJECT MODEL (POM) IMPLEMENTATIONS
+7. BROWSER CONTEXT MANAGEMENT
+8. PARALLEL EXECUTION & WORKERS
+9. CI/CD INTEGRATION
+10. DEBUGGING & TROUBLESHOOTING
+11. PERFORMANCE OPTIMIZATION
+12. COMMON PATTERNS & ANTI-PATTERNS
+
+================================================================================
+    1. PROJECT SETUP & INITIALIZATION
+================================================================================
+
+Example 1.1: New Project Setup from Scratch
+------------------------------------------------------------
+
+# Step 1: Initialize Node.js project
+mkdir my-playwright-tests
+cd my-playwright-tests
+npm init -y
+
+# Step 2: Install Playwright
+npm install -D @playwright/test
+
+# Step 3: Install browsers
+npx playwright install
+
+# Step 4: Initialize Playwright configuration
+npx playwright init
+
+# Generated structure:
+my-playwright-tests/
+├── tests/
+│   └── example.spec.ts
+├── playwright.config.ts
+├── package.json
+└── node_modules/
+
+
+Example 1.2: Custom Project Structure Setup
+------------------------------------------------------------
+
+// File: playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './e2e',  // Custom test directory
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+  ],
+});
+
+// Custom folder structure:
+my-app-tests/
+├── e2e/                    # Test files
+│   ├── auth/
+│   ├── checkout/
+│   └── search/
+├── fixtures/               # Custom fixtures
+├── pages/                  # Page objects
+├── utils/                  # Helper functions
+└── playwright.config.ts
+
+
+Example 1.3: TypeScript Configuration
+------------------------------------------------------------
+
+// File: tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": ["node", "@playwright/test"],
+    "baseUrl": ".",
+    "paths": {
+      "@pages/*": ["pages/*"],
+      "@fixtures/*": ["fixtures/*"],
+      "@utils/*": ["utils/*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}
+
+
+Example 1.4: Package.json Scripts Setup
+------------------------------------------------------------
+
+// File: package.json
+{
+  "name": "playwright-automation",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:chrome": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:mobile": "playwright test --project=mobile",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:regression": "playwright test --grep @regression",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen",
+    "install:browsers": "playwright install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+
+
+================================================================================
+    2. CONFIGURATION PATTERNS
+================================================================================
+
+Example 2.1: Multi-Environment Configuration
+------------------------------------------------------------
+
+// File: playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+const environment = process.env.TEST_ENV || 'staging';
+
+const envConfigs = {
+  local: {
+    baseURL: 'http://localhost:3000',
+    workers: 4,
+  },
+  staging: {
+    baseURL: 'https://staging.myapp.com',
+    workers: 2,
+  },
+  production: {
+    baseURL: 'https://myapp.com',
+    workers: 1,
+    retries: 3,
+  },
+};
+
+export default defineConfig({
+  ...envConfigs[environment],
+  testDir: './tests',
+  use: {
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+  },
+});
+
+// Usage:
+// TEST_ENV=local npm test
+// TEST_ENV=staging npm test
+// TEST_ENV=production npm test
+
+
+Example 2.2: Project-Based Configuration
+------------------------------------------------------------
+
+// File: playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  projects: [
+    // Setup project for authentication
+    { 
+      name: 'setup', 
+      testMatch: /.*\.setup\.ts/,
+    },
+    
+    // Desktop browsers
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+      dependencies: ['setup'],
+    },
+    
+    // Mobile browsers
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'mobile-safari',
+      use: { ...devices['iPhone 13'] },
+    },
+    
+    // Branded browsers
+    {
+      name: 'edge',
+      use: { 
+        ...devices['Desktop Edge'],
+        channel: 'msedge',
+      },
+    },
+    
+    // Custom viewport
+    {
+      name: 'tablet',
+      use: {
+        viewport: { width: 768, height: 1024 },
+        deviceScaleFactor: 2,
+      },
+    },
+  ],
+});
+
+
+Example 2.3: Advanced Use Options Configuration
+------------------------------------------------------------
+
+// File: playwright.config.ts
+export default defineConfig({
+  use: {
+    // Base URL
+    baseURL: 'https://myapp.com',
+    
+    // Browser context options
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    geolocation: { longitude: -74.006, latitude: 40.7128 },
+    permissions: ['geolocation', 'notifications'],
+    colorScheme: 'dark',
+    
+    // Navigation options
+    navigationTimeout: 30000,
+    actionTimeout: 10000,
+    
+    // Screenshot options
+    screenshot: {
+      mode: 'only-on-failure',
+      fullPage: true,
+    },
+    
+    // Video recording
+    video: {
+      mode: 'retain-on-failure',
+      size: { width: 1280, height: 720 },
+    },
+    
+    // Trace options
+    trace: {
+      mode: 'retain-on-failure',
+      screenshots: true,
+      snapshots: true,
+      sources: true,
+    },
+    
+    // Network options
+    extraHTTPHeaders: {
+      'X-Custom-Header': 'value',
+    },
+    
+    // Viewport
+    viewport: { width: 1280, height: 720 },
+    
+    // Storage state
+    storageState: 'auth.json',
+  },
+});
+
+
+Example 2.4: Reporter Configuration
+------------------------------------------------------------
+
+// File: playwright.config.ts
+export default defineConfig({
+  reporter: [
+    // HTML reporter
+    ['html', { 
+      outputFolder: 'test-results/html',
+      open: 'never',
+    }],
+    
+    // JSON reporter
+    ['json', { 
+      outputFile: 'test-results/results.json',
+    }],
+    
+    // JUnit reporter for CI
+    ['junit', { 
+      outputFile: 'test-results/junit.xml',
+    }],
+    
+    // List reporter for console
+    ['list'],
+    
+    // Custom reporter
+    ['./custom-reporter.ts'],
+  ],
+});
+
+// File: custom-reporter.ts
+import { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
+
+class CustomReporter implements Reporter {
+  onTestEnd(test: TestCase, result: TestResult) {
+    console.log(`Test: ${test.title} - ${result.status}`);
+  }
+  
+  onEnd() {
+    console.log('All tests completed!');
+  }
+}
+
+export default CustomReporter;
+
+
+================================================================================
+    3. TEST FILE ORGANIZATION
+================================================================================
+
+Example 3.1: Basic Test Structure
+------------------------------------------------------------
+
+// File: tests/login.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Login functionality', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
+  });
+
+  test('successful login with valid credentials', async ({ page }) => {
+    await page.fill('#username', 'testuser');
+    await page.fill('#password', 'password123');
+    await page.click('button[type="submit"]');
+    
+    await expect(page).toHaveURL('/dashboard');
+    await expect(page.locator('.welcome-message')).toBeVisible();
+  });
+
+  test('failed login with invalid credentials', async ({ page }) => {
+    await page.fill('#username', 'invalid');
+    await page.fill('#password', 'wrong');
+    await page.click('button[type="submit"]');
+    
+    await expect(page.locator('.error-message')).toContainText('Invalid credentials');
+  });
+  
+  test('password field should be masked', async ({ page }) => {
+    const passwordInput = page.locator('#password');
+    await expect(passwordInput).toHaveAttribute('type', 'password');
+  });
+});
+
+
+Example 3.2: Grouped Tests with Tags
+------------------------------------------------------------
+
+// File: tests/e2e/checkout.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Checkout Process', { tag: '@critical' }, () => {
+  
+  test('complete checkout flow', { tag: '@smoke' }, async ({ page }) => {
+    // Test implementation
+  });
+  
+  test('checkout with coupon code', { tag: '@regression' }, async ({ page }) => {
+    // Test implementation
+  });
+});
+
+// Run specific tags:
+// npx playwright test --grep @smoke
+// npx playwright test --grep @critical
+// npx playwright test --grep "@critical.*@smoke"
+
+
+Example 3.3: Parameterized Tests
+------------------------------------------------------------
+
+// File: tests/search.spec.ts
+import { test, expect } from '@playwright/test';
+
+const searchTerms = [
+  { query: 'laptop', expectedResults: 'Laptops' },
+  { query: 'phone', expectedResults: 'Smartphones' },
+  { query: 'tablet', expectedResults: 'Tablets' },
+];
+
+searchTerms.forEach(({ query, expectedResults }) => {
+  test(`search for "${query}"`, async ({ page }) => {
+    await page.goto('/');
+    await page.fill('#search', query);
+    await page.press('#search', 'Enter');
+    
+    await expect(page.locator('.search-results h1')).toContainText(expectedResults);
+  });
+});
+
+
+Example 3.4: Conditional Test Execution
+------------------------------------------------------------
+
+// File: tests/feature-flags.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Feature Flag Tests', () => {
+  
+  test('new feature test', async ({ page, browserName }) => {
+    // Skip on specific browser
+    test.skip(browserName === 'webkit', 'Not supported on Safari yet');
+    
+    await page.goto('/new-feature');
+    // Test implementation
+  });
+  
+  test('mobile-only feature', async ({ page, isMobile }) => {
+    // Run only on mobile
+    test.skip(!isMobile, 'Mobile-only feature');
+    
+    // Test implementation
+  });
+  
+  test('experimental feature', async ({ page }) => {
+    // Conditional skip based on environment
+    test.skip(process.env.TEST_ENV === 'production', 'Experimental feature');
+    
+    // Test implementation
+  });
+});
+
+
+Example 3.5: Test Hooks Organization
+------------------------------------------------------------
+
+// File: tests/complex-flow.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Complex User Flow', () => {
+  
+  // Runs once before all tests in this file
+  test.beforeAll(async ({ browser }) => {
+    console.log('Setting up test data...');
+    // Database setup, API calls, etc.
+  });
+  
+  // Runs before each test
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+  });
+  
+  // Runs after each test
+  test.afterEach(async ({ page }, testInfo) => {
+    if (testInfo.status === 'failed') {
+      await page.screenshot({ 
+        path: `screenshots/${testInfo.title}.png` 
+      });
+    }
+  });
+  
+  // Runs once after all tests
+  test.afterAll(async () => {
+    console.log('Cleaning up test data...');
+    // Database cleanup, etc.
+  });
+  
+  test('user journey test 1', async ({ page }) => {
+    // Test implementation
+  });
+  
+  test('user journey test 2', async ({ page }) => {
+    // Test implementation
+  });
+});
+
+
+================================================================================
+    4. CUSTOM FIXTURES
+================================================================================
+
+Example 4.1: Basic Custom Fixture
+------------------------------------------------------------
+
+// File: fixtures/custom-fixtures.ts
+import { test as base } from '@playwright/test';
+
+type MyFixtures = {
+  userName: string;
+};
+
+export const test = base.extend<MyFixtures>({
+  userName: async ({}, use) => {
+    const name = 'Test User';
+    await use(name);
+  },
+});
+
+// File: tests/with-fixture.spec.ts
+import { test } from '../fixtures/custom-fixtures';
+import { expect } from '@playwright/test';
+
+test('use custom fixture', async ({ page, userName }) => {
+  await page.goto('/profile');
+  await expect(page.locator('.username')).toContainText(userName);
+});
+
+
+Example 4.2: Fixture with Setup and Teardown
+------------------------------------------------------------
+
+// File: fixtures/database.ts
+import { test as base } from '@playwright/test';
+
+type DatabaseFixture = {
+  testDatabase: {
+    query: (sql: string) => Promise<any>;
+    cleanup: () => Promise<void>;
+  };
+};
+
+export const test = base.extend<DatabaseFixture>({
+  testDatabase: async ({}, use) => {
+    // Setup
+    const db = {
+      connection: null,
+      
+      async query(sql: string) {
+        console.log(`Executing: ${sql}`);
+        // Database query logic
+        return [];
+      },
+      
+      async cleanup() {
+        console.log('Cleaning up database...');
+        // Cleanup logic
+      },
+    };
+    
+    // Provide fixture
+    await use(db);
+    
+    // Teardown
+    await db.cleanup();
+  },
+});
+
+
+Example 4.3: Authenticated User Fixture
+------------------------------------------------------------
+
+// File: fixtures/auth.ts
+import { test as base } from '@playwright/test';
+
+type AuthFixture = {
+  authenticatedPage: any;
+};
+
+export const test = base.extend<AuthFixture>({
+  authenticatedPage: async ({ page }, use) => {
+    // Login before test
+    await page.goto('/login');
+    await page.fill('#username', 'testuser');
+    await page.fill('#password', 'password123');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/dashboard');
+    
+    // Provide authenticated page
+    await use(page);
+    
+    // Logout after test
+    await page.click('#logout-button');
+  },
+});
+
+// Usage:
+import { test } from '../fixtures/auth';
+import { expect } from '@playwright/test';
+
+test('access protected page', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/protected');
+  await expect(authenticatedPage.locator('h1')).toContainText('Protected Content');
+});
+
+
+Example 4.4: API Client Fixture
+------------------------------------------------------------
+
+// File: fixtures/api.ts
+import { test as base } from '@playwright/test';
+import { APIRequestContext } from '@playwright/test';
+
+type ApiFixture = {
+  apiClient: APIRequestContext;
+  apiHelpers: {
+    createUser: (userData: any) => Promise<any>;
+    deleteUser: (userId: string) => Promise<void>;
+  };
+};
+
+export const test = base.extend<ApiFixture>({
+  apiClient: async ({ playwright }, use) => {
+    const context = await playwright.request.newContext({
+      baseURL: 'https://api.myapp.com',
+      extraHTTPHeaders: {
+        'Authorization': `Bearer ${process.env.API_TOKEN}`,
+      },
+    });
+    
+    await use(context);
+    await context.dispose();
+  },
+  
+  apiHelpers: async ({ apiClient }, use) => {
+    const helpers = {
+      async createUser(userData: any) {
+        const response = await apiClient.post('/users', { data: userData });
+        return await response.json();
+      },
+      
+      async deleteUser(userId: string) {
+        await apiClient.delete(`/users/${userId}`);
+      },
+    };
+    
+    await use(helpers);
+  },
+});
+
+
+Example 4.5: Combining Multiple Fixtures
+------------------------------------------------------------
+
+// File: fixtures/combined.ts
+import { test as base } from '@playwright/test';
+
+type AllFixtures = {
+  logger: {
+    log: (message: string) => void;
+  };
+  testData: {
+    users: any[];
+    products: any[];
+  };
+  customPage: any;
+};
+
+export const test = base.extend<AllFixtures>({
+  logger: async ({}, use) => {
+    const logger = {
+      log: (message: string) => {
+        console.log(`[${new Date().toISOString()}] ${message}`);
+      },
+    };
+    await use(logger);
+  },
+  
+  testData: async ({}, use) => {
+    const data = {
+      users: [
+        { id: 1, name: 'User 1' },
+        { id: 2, name: 'User 2' },
+      ],
+      products: [
+        { id: 1, name: 'Product 1', price: 100 },
+        { id: 2, name: 'Product 2', price: 200 },
+      ],
+    };
+    await use(data);
+  },
+  
+  customPage: async ({ page, logger }, use) => {
+    logger.log('Setting up custom page');
+    
+    // Add custom methods to page
+    const customPage = Object.assign(page, {
+      async loginAs(username: string) {
+        logger.log(`Logging in as ${username}`);
+        await page.goto('/login');
+        await page.fill('#username', username);
+        await page.fill('#password', 'password');
+        await page.click('button[type="submit"]');
+      },
+    });
+    
+    await use(customPage);
+    
+    logger.log('Tearing down custom page');
+  },
+});
+
+
+================================================================================
+    5. AUTHENTICATION & SESSION MANAGEMENT
+================================================================================
+
+Example 5.1: Save and Reuse Authentication State
+------------------------------------------------------------
+
+// File: tests/auth.setup.ts
+import { test as setup } from '@playwright/test';
+
+setup('authenticate', async ({ page }) => {
+  await page.goto('/login');
+  await page.fill('#username', 'testuser');
+  await page.fill('#password', 'password123');
+  await page.click('button[type="submit"]');
+  
+  await page.waitForURL('/dashboard');
+  
+  // Save storage state
+  await page.context().storageState({ path: 'auth.json' });
+});
+
+// File: playwright.config.ts
+export default defineConfig({
+  projects: [
+    { name: 'setup', testMatch: /.*\.setup\.ts/ },
+    {
+      name: 'chromium',
+      use: { storageState: 'auth.json' },
+      dependencies: ['setup'],
+    },
+  ],
+});
+
+
+Example 5.2: Multiple User Roles Authentication
+------------------------------------------------------------
+
+// File: tests/multi-auth.setup.ts
+import { test as setup } from '@playwright/test';
+
+const users = [
+  { role: 'admin', username: 'admin', password: 'admin123' },
+  { role: 'user', username: 'user', password: 'user123' },
+  { role: 'guest', username: 'guest', password: 'guest123' },
+];
+
+for (const user of users) {
+  setup(`authenticate as ${user.role}`, async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('#username', user.username);
+    await page.fill('#password', user.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('/dashboard');
+    
+    await page.context().storageState({ 
+      path: `auth-${user.role}.json` 
+    });
+  });
+}
+
+// File: tests/admin.spec.ts
+import { test } from '@playwright/test';
+
+test.use({ storageState: 'auth-admin.json' });
+
+test('admin can access admin panel', async ({ page }) => {
+  await page.goto('/admin');
+  // Admin-specific tests
+});
+
+
+Example 5.3: API-Based Authentication
+------------------------------------------------------------
+
+// File: tests/api-auth.setup.ts
+import { test as setup } from '@playwright/test';
+
+setup('get auth token', async ({ request }) => {
+  const response = await request.post('https://api.myapp.com/auth/login', {
+    data: {
+      username: 'testuser',
+      password: 'password123',
+    },
+  });
+  
+  const { token } = await response.json();
+  
+  // Save token to file or environment
+  process.env.AUTH_TOKEN = token;
+});
+
+// File: tests/with-api-auth.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('use API with auth token', async ({ request }) => {
+  const response = await request.get('https://api.myapp.com/user/profile', {
+    headers: {
+      'Authorization': `Bearer ${process.env.AUTH_TOKEN}`,
+    },
+  });
+  
+  expect(response.ok()).toBeTruthy();
+  const data = await response.json();
+  expect(data.username).toBe('testuser');
+});
+
+
+Example 5.4: Session Management with Cookies
+------------------------------------------------------------
+
+// File: tests/cookie-auth.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Cookie-based authentication', () => {
+  
+  test.beforeEach(async ({ context }) => {
+    // Set authentication cookie
+    await context.addCookies([
+      {
+        name: 'session_id',
+        value: 'abc123xyz',
+        domain: 'myapp.com',
+        path: '/',
+        httpOnly: true,
+        secure: true,
+      },
+    ]);
+  });
+  
+  test('access protected page with cookie', async ({ page }) => {
+    await page.goto('/protected');
+    await expect(page.locator('h1')).toContainText('Protected Content');
+  });
+  
+  test('verify cookie persistence', async ({ page, context }) => {
+    await page.goto('/');
+    
+    const cookies = await context.cookies();
+    const sessionCookie = cookies.find(c => c.name === 'session_id');
+    
+    expect(sessionCookie).toBeDefined();
+    expect(sessionCookie.value).toBe('abc123xyz');
+  });
+});
+
+
+Example 5.5: OAuth/SSO Authentication Flow
+------------------------------------------------------------
+
+// File: tests/oauth.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('OAuth login flow', async ({ page, context }) => {
+  // Navigate to app
+  await page.goto('/');
+  
+  // Click OAuth login button
+  const [popup] = await Promise.all([
+    context.waitForEvent('page'),
+    page.click('button:has-text("Login with Google")'),
+  ]);
+  
+  // Handle OAuth provider page
+  await popup.waitForLoadState();
+  await popup.fill('#email', 'testuser@gmail.com');
+  await popup.fill('#password', 'password123');
+  await popup.click('button[type="submit"]');
+  
+  // Wait for redirect back to app
+  await page.waitForURL('/dashboard');
+  
+  // Verify logged in
+  await expect(page.locator('.user-profile')).toBeVisible();
+  
+  // Save authentication state
+  await context.storageState({ path: 'oauth-auth.json' });
+});
+
+
+================================================================================
+    6. PAGE OBJECT MODEL (POM) IMPLEMENTATIONS
+================================================================================
+
+Example 6.1: Basic Page Object
+------------------------------------------------------------
+
+// File: pages/LoginPage.ts
+import { Page, Locator } from '@playwright/test';
+
+export class LoginPage {
+  readonly page: Page;
+  readonly usernameInput: Locator;
+  readonly passwordInput: Locator;
+  readonly submitButton: Locator;
+  readonly errorMessage: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.usernameInput = page.locator('#username');
+    this.passwordInput = page.locator('#password');
+    this.submitButton = page.locator('button[type="submit"]');
+    this.errorMessage = page.locator('.error-message');
+  }
+
+  async goto() {
+    await this.page.goto('/login');
+  }
+
+  async login(username: string, password: string) {
+    await this.usernameInput.fill(username);
+    await this.passwordInput.fill(password);
+    await this.submitButton.click();
+  }
+
+  async getErrorMessage() {
+    return await this.errorMessage.textContent();
+  }
+}
+
+// Usage in test:
+import { test, expect } from '@playwright/test';
+import { LoginPage } from '../pages/LoginPage';
+
+test('login with valid credentials', async ({ page }) => {
+  const loginPage = new LoginPage(page);
+  await loginPage.goto();
+  await loginPage.login('testuser', 'password123');
+  
+  await expect(page).toHaveURL('/dashboard');
+});
+
+
+Example 6.2: Advanced Page Object with Methods
+------------------------------------------------------------
+
+// File: pages/ProductPage.ts
+import { Page, Locator, expect } from '@playwright/test';
+
+export class ProductPage {
+  readonly page: Page;
+  readonly productTitle: Locator;
+  readonly productPrice: Locator;
+  readonly addToCartButton: Locator;
+  readonly quantityInput: Locator;
+  readonly reviewsSection: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.productTitle = page.locator('h1.product-title');
+    this.productPrice = page.locator('.product-price');
+    this.addToCartButton = page.locator('button:has-text("Add to Cart")');
+    this.quantityInput = page.locator('#quantity');
+    this.reviewsSection = page.locator('.reviews');
+  }
+
+  async goto(productId: string) {
+    await this.page.goto(`/products/${productId}`);
+  }
+
+  async getProductInfo() {
+    return {
+      title: await this.productTitle.textContent(),
+      price: await this.productPrice.textContent(),
+    };
+  }
+
+  async addToCart(quantity: number = 1) {
+    await this.quantityInput.fill(quantity.toString());
+    await this.addToCartButton.click();
+    
+    // Wait for success indication
+    await this.page.waitForSelector('.cart-notification');
+  }
+
+  async getReviewCount() {
+    const reviewText = await this.reviewsSection.locator('.review-count').textContent();
+    return parseInt(reviewText.match(/\d+/)[0]);
+  }
+
+  async selectVariant(option: string) {
+    await this.page.selectOption('.variant-selector', option);
+  }
+
+  async verifyProductDisplayed() {
+    await expect(this.productTitle).toBeVisible();
+    await expect(this.productPrice).toBeVisible();
+    await expect(this.addToCartButton).toBeEnabled();
+  }
+}
+
+
+Example 6.3: Component-Based Page Objects
+------------------------------------------------------------
+
+// File: components/Header.ts
+import { Page, Locator } from '@playwright/test';
+
+export class Header {
+  readonly page: Page;
+  readonly logo: Locator;
+  readonly searchBox: Locator;
+  readonly cartIcon: Locator;
+  readonly userMenu: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.logo = page.locator('.header .logo');
+    this.searchBox = page.locator('#search');
+    this.cartIcon = page.locator('.cart-icon');
+    this.userMenu = page.locator('.user-menu');
+  }
+
+  async search(query: string) {
+    await this.searchBox.fill(query);
+    await this.searchBox.press('Enter');
+  }
+
+  async openCart() {
+    await this.cartIcon.click();
+  }
+
+  async logout() {
+    await this.userMenu.click();
+    await this.page.click('text=Logout');
+  }
+}
+
+// File: pages/BasePage.ts
+import { Page } from '@playwright/test';
+import { Header } from '../components/Header';
+
+export class BasePage {
+  readonly page: Page;
+  readonly header: Header;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.header = new Header(page);
+  }
+}
+
+// File: pages/HomePage.ts
+import { BasePage } from './BasePage';
+import { Page, Locator } from '@playwright/test';
+
+export class HomePage extends BasePage {
+  readonly featuredProducts: Locator;
+  readonly categories: Locator;
+
+  constructor(page: Page) {
+    super(page);
+    this.featuredProducts = page.locator('.featured-products');
+    this.categories = page.locator('.categories');
+  }
+
+  async goto() {
+    await this.page.goto('/');
+  }
+
+  async selectCategory(category: string) {
+    await this.categories.locator(`text=${category}`).click();
+  }
+}
+
+
+Example 6.4: Page Object with Fluent Interface
+------------------------------------------------------------
+
+// File: pages/CheckoutPage.ts
+import { Page, Locator } from '@playwright/test';
+
+export class CheckoutPage {
+  readonly page: Page;
+
+  constructor(page: Page) {
+    this.page = page;
+  }
+
+  async goto() {
+    await this.page.goto('/checkout');
+    return this;
+  }
+
+  async fillShippingInfo(info: {
+    name: string;
+    address: string;
+    city: string;
+    zip: string;
+  }) {
+    await this.page.fill('#name', info.name);
+    await this.page.fill('#address', info.address);
+    await this.page.fill('#city', info.city);
+    await this.page.fill('#zip', info.zip);
+    return this;
+  }
+
+  async selectShippingMethod(method: string) {
+    await this.page.click(`input[value="${method}"]`);
+    return this;
+  }
+
+  async fillPaymentInfo(cardNumber: string, cvv: string) {
+    await this.page.fill('#card-number', cardNumber);
+    await this.page.fill('#cvv', cvv);
+    return this;
+  }
+
+  async submitOrder() {
+    await this.page.click('button:has-text("Place Order")');
+    return this;
+  }
+
+  async waitForConfirmation() {
+    await this.page.waitForSelector('.order-confirmation');
+    return this;
+  }
+}
+
+// Fluent usage:
+test('complete checkout flow', async ({ page }) => {
+  const checkout = new CheckoutPage(page);
+  
+  await checkout
+    .goto()
+    .fillShippingInfo({
+      name: 'John Doe',
+      address: '123 Main St',
+      city: 'New York',
+      zip: '10001',
+    })
+    .selectShippingMethod('express')
+    .fillPaymentInfo('4111111111111111', '123')
+    .submitOrder()
+    .waitForConfirmation();
+});
+
+
+Example 6.5: Page Object Factory Pattern
+------------------------------------------------------------
+
+// File: pages/PageFactory.ts
+import { Page } from '@playwright/test';
+import { LoginPage } from './LoginPage';
+import { HomePage } from './HomePage';
+import { ProductPage } from './ProductPage';
+import { CheckoutPage } from './CheckoutPage';
+
+export class PageFactory {
+  private page: Page;
+
+  constructor(page: Page) {
+    this.page = page;
+  }
+
+  getLoginPage(): LoginPage {
+    return new LoginPage(this.page);
+  }
+
+  getHomePage(): HomePage {
+    return new HomePage(this.page);
+  }
+
+  getProductPage(): ProductPage {
+    return new ProductPage(this.page);
+  }
+
+  getCheckoutPage(): CheckoutPage {
+    return new CheckoutPage(this.page);
+  }
+}
+
+// File: fixtures/page-factory.ts
+import { test as base } from '@playwright/test';
+import { PageFactory } from '../pages/PageFactory';
+
+type PageFixture = {
+  pages: PageFactory;
+};
+
+export const test = base.extend<PageFixture>({
+  pages: async ({ page }, use) => {
+    await use(new PageFactory(page));
+  },
+});
+
+// Usage:
+import { test } from '../fixtures/page-factory';
+
+test('user journey with page factory', async ({ pages }) => {
+  const loginPage = pages.getLoginPage();
+  const homePage = pages.getHomePage();
+  
+  await loginPage.goto();
+  await loginPage.login('user', 'pass');
+  
+  await homePage.selectCategory('Electronics');
+});
+
+
+================================================================================
+    7. BROWSER CONTEXT MANAGEMENT
+================================================================================
+
+Example 7.1: Multiple Contexts in Single Test
+------------------------------------------------------------
+
+import { test, expect } from '@playwright/test';
+
+test('multiple user sessions', async ({ browser }) => {
+  // Create first context for admin user
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  await adminPage.goto('/login');
+  await adminPage.fill('#username', 'admin');
+  await adminPage.fill('#password', 'admin123');
+  await adminPage.click('button[type="submit"]');
+
+  // Create second context for regular user
+  const userContext = await browser.newContext();
+  const userPage = await userContext.newPage();
+  await userPage.goto('/login');
+  await userPage.fill('#username', 'user');
+  await userPage.fill('#password', 'user123');
+  await userPage.click('button[type="submit"]');
+
+  // Perform actions in both contexts
+  await adminPage.goto('/admin/users');
+  await userPage.goto('/profile');
+
+  // Verify isolation
+  await expect(adminPage.locator('.admin-panel')).toBeVisible();
+  await expect(userPage.locator('.admin-panel')).not.toBeVisible();
+
+  // Cleanup
+  await adminContext.close();
+  await userContext.close();
+});
+
+
+Example 7.2: Context with Custom Options
+------------------------------------------------------------
+
+import { test } from '@playwright/test';
+
+test('context with geolocation', async ({ browser }) => {
+  const context = await browser.newContext({
+    geolocation: { longitude: -74.006, latitude: 40.7128 },
+    permissions: ['geolocation'],
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    colorScheme: 'dark',
+    viewport: { width: 1280, height: 720 },
+  });
+
+  const page = await context.newPage();
+  await page.goto('/map');
+  
+  // Verify geolocation is set
+  const location = await page.evaluate(() => {
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition((position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      });
+    });
+  });
+  
+  console.log('Location:', location);
+  
+  await context.close();
+});
+
+
+Example 7.3: Context with Network Interception
+------------------------------------------------------------
+
+import { test, expect } from '@playwright/test';
+
+test('mock API responses', async ({ browser }) => {
+  const context = await browser.newContext();
+  
+  // Intercept and mock API call
+  await context.route('**/api/products', (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { id: 1, name: 'Mock Product 1', price: 100 },
+        { id: 2, name: 'Mock Product 2', price: 200 },
+      ]),
+    });
+  });
+  
+  const page = await context.newPage();
+  await page.goto('/products');
+  
+  // Verify mocked data is displayed
+  await expect(page.locator('.product-name').first()).toContainText('Mock Product 1');
+  
+  await context.close();
+});
+
+
+Example 7.4: Context with HAR Recording
+------------------------------------------------------------
+
+import { test } from '@playwright/test';
+
+test('record network traffic', async ({ browser }) => {
+  const context = await browser.newContext({
+    recordHar: {
+      path: 'network-traffic.har',
+      mode: 'minimal', // or 'full'
+    },
+  });
+  
+  const page = await context.newPage();
+  await page.goto('/');
+  await page.click('a[href="/products"]');
+  
+  // All network traffic is recorded to HAR file
+  
+  await context.close();
+  // HAR file is now available for analysis
+});
+
+
+Example 7.5: Persistent Context
+------------------------------------------------------------
+
+import { test, chromium } from '@playwright/test';
+
+test('persistent context with user data', async () => {
+  const userDataDir = './test-user-data';
+  
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    headless: false,
+    viewport: { width: 1280, height: 720 },
+  });
+  
+  const page = context.pages()[0] || await context.newPage();
+  
+  // First visit - login
+  await page.goto('/login');
+  await page.fill('#username', 'testuser');
+  await page.fill('#password', 'password123');
+  await page.click('button[type="submit"]');
+  
+  await context.close();
+  
+  // Second visit - session persists
+  const context2 = await chromium.launchPersistentContext(userDataDir, {
+    headless: false,
+  });
+  
+  const page2 = context2.pages()[0] || await context2.newPage();
+  await page2.goto('/');
+  
+  // User should still be logged in
+  
+  await context2.close();
+});
+
+
+================================================================================
+    8. PARALLEL EXECUTION & WORKERS
+================================================================================
+
+Example 8.1: Configuring Workers
+------------------------------------------------------------
+
+// File: playwright.config.ts
+export default defineConfig({
+  // Run tests in parallel
+  fullyParallel: true,
+  
+  // Number of workers
+  workers: process.env.CI ? 2 : 4,
+  
+  // Maximum failures before stopping
+  maxFailures: process.env.CI ? 3 : undefined,
+});
+
+
+Example 8.2: Serial Test Execution
+------------------------------------------------------------
+
+// File: tests/serial.spec.ts
+import { test } from '@playwright/test';
+
+// Run tests in this file serially
+test.describe.configure({ mode: 'serial' });
+
+let orderId: string;
+
+test.describe('Order Flow', () => {
+  test('create order', async ({ page }) => {
+    // Create order
+    orderId = '12345';
+  });
+  
+  test('verify order', async ({ page }) => {
+    // Use orderId from previous test
+    await page.goto(`/orders/${orderId}`);
+  });
+  
+  test('cancel order', async ({ page }) => {
+    await page.goto(`/orders/${orderId}/cancel`);
+  });
+});
+
+
+Example 8.3: Worker Scoped Fixtures
+------------------------------------------------------------
+
+// File: fixtures/worker-fixtures.ts
+import { test as base } from '@playwright/test';
+
+type WorkerFixture = {
+  workerData: string;
+};
+
+export const test = base.extend<{}, WorkerFixture>({
+  workerData: [async ({}, use, workerInfo) => {
+    console.log(`Worker ${workerInfo.workerIndex} started`);
+    const data = `Worker-${workerInfo.workerIndex}-data`;
+    await use(data);
+    console.log(`Worker ${workerInfo.workerIndex} finished`);
+  }, { scope: 'worker' }],
+});
+
+
+Example 8.4: Sharding for CI
+------------------------------------------------------------
+
+# Run tests in 4 shards
+npx playwright test --shard=1/4
+npx playwright test --shard=2/4
+npx playwright test --shard=3/4
+npx playwright test --shard=4/4
+
+# In GitHub Actions:
+# .github/workflows/tests.yml
+jobs:
+  test:
+    strategy:
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
+    steps:
+      - run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+
+
+Example 8.5: Worker Index Usage
+------------------------------------------------------------
+
+// File: tests/worker-aware.spec.ts
+import { test } from '@playwright/test';
+
+test('worker-specific test', async ({ page }, testInfo) => {
+  const workerIndex = testInfo.workerIndex;
+  
+  // Use different data based on worker
+  const testUser = `user${workerIndex}`;
+  const testPort = 3000 + workerIndex;
+  
+  await page.goto(`http://localhost:${testPort}`);
+  console.log(`Running on worker ${workerIndex} as ${testUser}`);
+});
+
+
+================================================================================
+    9. CI/CD INTEGRATION
+================================================================================
+
+Example 9.1: GitHub Actions Workflow
+------------------------------------------------------------
+
+# File: .github/workflows/playwright.yml
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      
+      - name: Run Playwright tests
+        run: npm test
+        env:
+          TEST_ENV: staging
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+
+Example 9.2: Jenkins Pipeline
+------------------------------------------------------------
+
+// File: Jenkinsfile
+pipeline {
+    agent any
+    
+    environment {
+        TEST_ENV = 'staging'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm ci'
+                sh 'npx playwright install --with-deps'
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
+                sh 'npm test'
+            }
+        }
+        
+        stage('Generate Report') {
+            steps {
+                publishHTML([
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'playwright-report',
+                    reportFiles: 'index.html',
+                    reportName: 'Playwright Test Report'
+                ])
+            }
+        }
+    }
+    
+    post {
+        always {
+            archiveArtifacts artifacts: 'playwright-report/**'
+            junit 'test-results/*.xml'
+        }
+    }
+}
+
+
+Example 9.3: GitLab CI Configuration
+------------------------------------------------------------
+
+# File: .gitlab-ci.yml
+image: mcr.microsoft.com/playwright:v1.40.0-jammy
+
+stages:
+  - test
+  - report
+
+variables:
+  TEST_ENV: "staging"
+
+playwright-tests:
+  stage: test
+  script:
+    - npm ci
+    - npx playwright install
+    - npm test
+  artifacts:
+    when: always
+    paths:
+      - playwright-report/
+      - test-results/
+    expire_in: 1 week
+
+pages:
+  stage: report
+  dependencies:
+    - playwright-tests
+  script:
+    - mkdir public
+    - cp -r playwright-report/* public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
+
+
+Example 9.4: Docker Container for Tests
+------------------------------------------------------------
+
+# File: Dockerfile
+FROM mcr.microsoft.com/playwright:v1.40.0-jammy
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+# Run tests
+CMD ["npm", "test"]
+
+# Build and run:
+# docker build -t playwright-tests .
+# docker run --rm playwright-tests
+
+
+Example 9.5: Azure DevOps Pipeline
+------------------------------------------------------------
+
+# File: azure-pipelines.yml
+trigger:
+  - main
+  - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  TEST_ENV: 'staging'
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18.x'
+    displayName: 'Install Node.js'
+
+  - script: |
+      npm ci
+      npx playwright install --with-deps
+    displayName: 'Install dependencies'
+
+  - script: npm test
+    displayName: 'Run Playwright tests'
+    env:
+      TEST_ENV: $(TEST_ENV)
+
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: 'test-results/*.xml'
+    displayName: 'Publish test results'
+
+  - task: PublishBuildArtifacts@1
+    condition: always()
+    inputs:
+      pathToPublish: 'playwright-report'
+      artifactName: 'playwright-report'
+    displayName: 'Publish test report'
+
+
+================================================================================
+    10. DEBUGGING & TROUBLESHOOTING
+================================================================================
+
+Example 10.1: Debug Mode
+------------------------------------------------------------
+
+# Run in debug mode
+npx playwright test --debug
+
+# Debug specific test
+npx playwright test login.spec.ts --debug
+
+# Debug from specific line
+npx playwright test --debug-on-failure
+
+
+Example 10.2: Using page.pause()
+------------------------------------------------------------
+
+import { test } from '@playwright/test';
+
+test('debug with pause', async ({ page }) => {
+  await page.goto('/');
+  
+  // Pause execution - Playwright Inspector opens
+  await page.pause();
+  
+  // Continue after inspection
+  await page.click('button');
+});
+
+
+Example 10.3: Verbose Logging
+------------------------------------------------------------
+
+// File: tests/with-logging.spec.ts
+import { test } from '@playwright/test';
+
+test('test with logging', async ({ page }) => {
+  // Enable verbose logging
+  page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+  page.on('request', request => console.log('>>', request.method(), request.url()));
+  page.on('response', response => console.log('<<', response.status(), response.url()));
+  
+  await page.goto('/');
+  await page.click('button');
+});
+
+# Run with DEBUG environment variable
+DEBUG=pw:api npx playwright test
+
+
+Example 10.4: Screenshots and Videos on Failure
+------------------------------------------------------------
+
+// File: playwright.config.ts
+export default defineConfig({
+  use: {
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    trace: 'retain-on-failure',
+  },
+});
+
+// File: tests/with-debug-artifacts.spec.ts
+import { test } from '@playwright/test';
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status === 'failed') {
+    // Take screenshot
+    await page.screenshot({ 
+      path: `screenshots/${testInfo.title}.png`,
+      fullPage: true,
+    });
+    
+    // Save page HTML
+    const html = await page.content();
+    await testInfo.attach('page-html', { 
+      body: html, 
+      contentType: 'text/html' 
+    });
+  }
+});
+
+
+Example 10.5: Trace Viewer
+------------------------------------------------------------
+
+// File: playwright.config.ts
+export default defineConfig({
+  use: {
+    trace: 'on-first-retry',
+    // or 'on', 'off', 'retain-on-failure'
+  },
+});
+
+# View trace after test
+npx playwright show-trace trace.zip
+
+# In test:
+import { test } from '@playwright/test';
+
+test('with tracing', async ({ page, context }) => {
+  // Start tracing
+  await context.tracing.start({ screenshots: true, snapshots: true });
+  
+  await page.goto('/');
+  await page.click('button');
+  
+  // Stop and save trace
+  await context.tracing.stop({ path: 'trace.zip' });
+});
+
+
+================================================================================
+    11. PERFORMANCE OPTIMIZATION
+================================================================================
+
+Example 11.1: Optimize Wait Strategies
+------------------------------------------------------------
+
+// GOOD - Explicit waits
+await page.waitForSelector('.results', { state: 'visible' });
+await page.waitForLoadState('networkidle');
+
+// BAD - Arbitrary timeouts
+await page.waitForTimeout(5000); // Avoid unless absolutely necessary
+
+
+Example 11.2: Parallel Test Execution
+------------------------------------------------------------
+
+// File: playwright.config.ts
+export default defineConfig({
+  fullyParallel: true,
+  workers: 4, // Run 4 tests in parallel
+});
+
+
+Example 11.3: Reuse Browser Contexts
+------------------------------------------------------------
+
+// File: fixtures/shared-context.ts
+import { test as base } from '@playwright/test';
+
+export const test = base.extend({
+  context: async ({ browser }, use) => {
+    const context = await browser.newContext();
+    await use(context);
+    await context.close();
+  },
+  
+  page: async ({ context }, use) => {
+    const page = await context.newPage();
+    await use(page);
+  },
+});
+
+
+Example 11.4: Optimize Network Requests
+------------------------------------------------------------
+
+import { test } from '@playwright/test';
+
+test('block unnecessary resources', async ({ context }) => {
+  // Block images, fonts, etc.
+  await context.route('**/*', (route) => {
+    const url = route.request().url();
+    if (url.match(/\.(jpg|jpeg|png|gif|css|woff|woff2)$/)) {
+      route.abort();
+    } else {
+      route.continue();
+    }
+  });
+  
+  const page = await context.newPage();
+  await page.goto('/');
+});
+
+
+Example 11.5: Use API for Setup
+------------------------------------------------------------
+
+import { test } from '@playwright/test';
+
+test('use API instead of UI for setup', async ({ page, request }) => {
+  // Create test data via API (faster)
+  await request.post('https://api.myapp.com/users', {
+    data: {
+      username: 'testuser',
+      email: 'test@example.com',
+    },
+  });
+  
+  // Then test UI
+  await page.goto('/users');
+  // Test assertions
+});
+
+
+================================================================================
+    12. COMMON PATTERNS & ANTI-PATTERNS
+================================================================================
+
+Example 12.1: ✅ GOOD - Auto-Waiting
+------------------------------------------------------------
+
+// GOOD - Auto-waits for element
+await page.click('button');
+await page.fill('#input', 'text');
+
+// BAD - Manual waiting (unnecessary)
+await page.waitForSelector('button');
+await page.click('button');
+
+
+Example 12.2: ✅ GOOD - Assertions with Auto-Retry
+------------------------------------------------------------
+
+// GOOD - Auto-retries until timeout
+await expect(page.locator('.status')).toContainText('Success');
+
+// BAD - Single check, may fail due to timing
+const text = await page.locator('.status').textContent();
+expect(text).toContain('Success');
+
+
+Example 12.3: ❌ BAD - Hard-Coded Waits
+------------------------------------------------------------
+
+// BAD - Arbitrary timeout
+await page.waitForTimeout(3000);
+await page.click('button');
+
+// GOOD - Wait for specific condition
+await page.waitForSelector('button', { state: 'visible' });
+await page.click('button');
+
+
+Example 12.4: ✅ GOOD - Locator Strategies
+------------------------------------------------------------
+
+// GOOD - Semantic locators
+await page.getByRole('button', { name: 'Submit' }).click();
+await page.getByLabel('Email').fill('test@example.com');
+await page.getByText('Welcome back').isVisible();
+
+// BAD - Fragile CSS selectors
+await page.click('.btn.btn-primary.submit-button-class-xyz');
+
+
+Example 12.5: ✅ GOOD - Test Independence
+------------------------------------------------------------
+
+// GOOD - Each test is independent
+test('test 1', async ({ page }) => {
+  await page.goto('/');
+  await page.fill('#search', 'laptop');
+  await page.press('#search', 'Enter');
+  await expect(page).toHaveURL(/search/);
+});
+
+test('test 2', async ({ page }) => {
+  await page.goto('/');
+  await page.click('a[href="/products"]');
+  await expect(page.locator('h1')).toContainText('Products');
+});
+
+// BAD - Tests depend on each other
+let productId: string;
+
+test('create product', async ({ page }) => {
+  // Creates product
+  productId = '123';
+});
+
+test('view product', async ({ page }) => {
+  // Depends on previous test
+  await page.goto(`/products/${productId}`);
+});
+
+
+Example 12.6: ✅ GOOD - Error Handling
+------------------------------------------------------------
+
+// GOOD - Graceful error handling
+test('handle popup', async ({ page }) => {
+  page.on('dialog', async dialog => {
+    console.log(`Dialog: ${dialog.message()}`);
+    await dialog.accept();
+  });
+  
+  await page.goto('/');
+  await page.click('#trigger-alert');
+});
+
+// BAD - Unhandled dialog causes test to hang
+test('trigger popup without handling', async ({ page }) => {
+  await page.goto('/');
+  await page.click('#trigger-alert'); // Hangs!
+});
+
+
+Example 12.7: ✅ GOOD - Cleanup
+------------------------------------------------------------
+
+// GOOD - Always cleanup
+test.afterEach(async ({ page, context }) => {
+  await context.clearCookies();
+  await context.clearPermissions();
+});
+
+// GOOD - Cleanup in fixture
+export const test = base.extend({
+  testData: async ({}, use) => {
+    const data = await createTestData();
+    await use(data);
+    await deleteTestData(data.id); // Cleanup
+  },
+});
+
+
+Example 12.8: ✅ GOOD - Efficient Assertions
+------------------------------------------------------------
+
+// GOOD - Single assertion with multiple checks
+await expect(page.locator('.product')).toHaveText([
+  'Product 1',
+  'Product 2',
+  'Product 3',
+]);
+
+// BAD - Multiple separate assertions
+await expect(page.locator('.product').nth(0)).toHaveText('Product 1');
+await expect(page.locator('.product').nth(1)).toHaveText('Product 2');
+await expect(page.locator('.product').nth(2)).toHaveText('Product 3');
+
+
+Example 12.9: ✅ GOOD - Readable Test Code
+------------------------------------------------------------
+
+// GOOD - Clear and readable
+test('user can complete purchase', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add to Cart' }).click();
+  await page.getByRole('button', { name: 'Checkout' }).click();
+  await page.getByLabel('Card Number').fill('4111111111111111');
+  await page.getByRole('button', { name: 'Pay Now' }).click();
+  
+  await expect(page.getByText('Order Confirmed')).toBeVisible();
+});
+
+// BAD - Unclear and hard to maintain
+test('tc_001', async ({ page }) => {
+  await page.goto('/');
+  await page.click('.btn-1');
+  await page.click('.btn-2');
+  await page.fill('#cc', '4111111111111111');
+  await page.click('.btn-3');
+  
+  await expect(page.locator('.msg')).toBeVisible();
+});
+
+
+Example 12.10: ✅ GOOD - DRY Principle with Fixtures
+------------------------------------------------------------
+
+// GOOD - Reusable fixtures
+export const test = base.extend({
+  loggedInPage: async ({ page }, use) => {
+    await page.goto('/login');
+    await page.fill('#username', 'testuser');
+    await page.fill('#password', 'password123');
+    await page.click('button[type="submit"]');
+    await use(page);
+  },
+});
+
+test('test 1', async ({ loggedInPage }) => {
+  await loggedInPage.goto('/profile');
+});
+
+test('test 2', async ({ loggedInPage }) => {
+  await loggedInPage.goto('/settings');
+});
+
+// BAD - Repeated code
+test('test 1', async ({ page }) => {
+  await page.goto('/login');
+  await page.fill('#username', 'testuser');
+  await page.fill('#password', 'password123');
+  await page.click('button[type="submit"]');
+  await page.goto('/profile');
+});
+
+test('test 2', async ({ page }) => {
+  await page.goto('/login');
+  await page.fill('#username', 'testuser');
+  await page.fill('#password', 'password123');
+  await page.click('button[type="submit"]');
+  await page.goto('/settings');
+});
+
+
+================================================================================
+    END OF PRACTICAL EXAMPLES
+================================================================================
+
+For more information:
+- Official Documentation: https://playwright.dev
+- API Reference: https://playwright.dev/docs/api/class-playwright
+- GitHub: https://github.com/microsoft/playwright
+- Community Discord: https://aka.ms/playwright/discord
+
+Happy Testing with Playwright! 🎭

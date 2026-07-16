@@ -1,0 +1,828 @@
+================================================================================
+TEST EXECUTION LIFECYCLE & FLOW - COMPLETE GUIDE
+Tutorial: 14_Test_Execution_Lifecycle_And_Flow_Complete_Guide.txt
+================================================================================
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. Command Execution Overview
+2. Stage 1: Initialization (0-500ms)
+3. Stage 2: Configuration Loading (500ms-1s)
+4. Stage 3: Test Discovery (1s-2s)
+5. Stage 4: Worker Pool Setup (2s-3s)
+6. Stage 5: Test Execution (3s - end)
+7. Stage 6: Result Reporting (end)
+8. Stage 7: Cleanup & Exit (final)
+9. Detailed Timing Analysis
+10. Common Execution Patterns
+
+================================================================================
+WHEN YOU RUN: npx playwright test pw_xpath.spec.ts
+================================================================================
+
+WHAT YOU SEE:
+    $ npx playwright test pw_xpath.spec.ts
+    
+    ✓ [chromium] › tests/pw_xpath.spec.ts:10 (3s)
+    ✓ [chromium] › tests/pw_xpath.spec.ts:25 (2s)
+    ✓ [chromium] › tests/pw_xpath.spec.ts:40 (2s)
+    ✓ [chromium] › tests/pw_xpath.spec.ts:55 (1s)
+    
+    8 passed (10s)
+
+WHAT'S HAPPENING BEHIND THE SCENES:
+
+A complex, multi-stage orchestration of processes occurs. Let me break it down
+in detail.
+
+
+================================================================================
+STAGE 1: COMMAND EXECUTION & NPX RESOLUTION (0-500ms)
+================================================================================
+
+WHAT HAPPENS:
+┌────────────────────────────────────────────────────────────────────────────┐
+│ User Types: npx playwright test pw_xpath.spec.ts                          │
+└────────────────────────────────────────────────────────────────────────────┘
+
+NPX processes the command:
+1. Check if 'playwright' is installed locally in node_modules
+2. If not found, check npm registry (rare, already installed)
+3. Locate: node_modules/.bin/playwright
+4. Load the Playwright CLI executable
+
+Playwright CLI starts:
+1. Spawn Node.js process
+2. Load Playwright test runner code
+3. Parse command-line arguments:
+   ├─ Command: test
+   ├─ File pattern: pw_xpath.spec.ts
+   ├─ Other flags: (none in this case)
+   └─ Default values: workers, timeout, retries, etc.
+
+TIMELINE:
+t=0ms    User types command
+t=100ms  NPX resolves playwright package
+t=200ms  Node.js process spawned
+t=300ms  CLI executable loaded
+t=500ms  Arguments parsed, ready for next stage
+
+
+================================================================================
+STAGE 2: CONFIGURATION LOADING (500ms - 1s)
+================================================================================
+
+WHAT HAPPENS:
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Playwright locates and loads playwright.config.ts                          │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Config File Discovery:
+1. Current directory: Does playwright.config.ts exist?
+   └─ YES: Load it
+2. If not found, check parent directories
+3. If not found, use default configuration
+
+In your case:
+    Found: c:\playwrightTutorials\playwright.config.ts
+
+Config Parsing:
+1. TypeScript compiler compiles playwright.config.ts
+2. Execute config code:
+   ├─ import statements processed
+   ├─ defineConfig() called
+   ├─ All config options read
+   └─ Configuration object created
+
+Config values extracted:
+    ✓ testDir: './tests'
+    ✓ testIgnore: '**/example.spec.ts'
+    ✓ fullyParallel: true
+    ✓ workers: undefined (auto-detect)
+    ✓ timeout: 30000
+    ✓ baseURL: 'https://demo.nopcommerce.com'
+    ✓ trace: 'on-first-retry'
+    ✓ projects: [{name: 'chromium', ...}]
+    ✓ reporter: 'html'
+
+CPU Core Detection (because workers: undefined):
+    1. Detect system CPU cores
+       └─ Your system: 6 cores
+    2. Calculate workers: 6
+    3. Set as: workers = 6
+
+TIMELINE:
+t=500ms  Config file located
+t=600ms  TypeScript compilation
+t=700ms  Config code executed
+t=800ms  CPU cores detected (6 cores)
+t=900ms  Configuration validated
+t=1000ms Config loading complete
+
+
+================================================================================
+STAGE 3: TEST DISCOVERY (1s - 2s)
+================================================================================
+
+WHAT HAPPENS:
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Playwright scans for test files and discovers all tests                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+File System Scan:
+1. Start from testDir: ./tests
+2. Recursively search for files matching pattern:
+   ├─ Include: *.spec.ts, *.test.ts
+   ├─ Exclude: **/example.spec.ts (from testIgnore)
+   └─ Found files:
+      ├─ pw_xpath.spec.ts ← Requested file
+      ├─ pw_csslocators.spec.ts
+      ├─ pw_builtin_locator.spec.ts
+      ├─ mytest.spec.ts
+      └─ mytest2.spec.ts (not executed - not in filter)
+
+File Filtering (because you specified pw_xpath.spec.ts):
+1. Only load: tests/pw_xpath.spec.ts
+2. Skip others
+
+Test File Loading:
+1. Read pw_xpath.spec.ts into memory
+2. TypeScript compiler compiles it
+3. Playwright test runner parses it
+
+Example of what it finds:
+
+    test('XPath locators - introduction', async ({page}) => {
+      // This is TEST 1
+    });
+    
+    test('XPath axis - ancestor locators', async ({page}) => {
+      // This is TEST 2
+    });
+    
+    test.describe('XPath Complex Examples', () => {
+      test('nested test 1', async ({page}) => {
+        // This is TEST 3.1
+      });
+    });
+
+Test Registry Created:
+    Total tests discovered: 17
+    
+    Test structure:
+    ├─ Test 1: "XPath locators - introduction"
+    ├─ Test 2: "XPath axis - ancestor locators"
+    ├─ Test 3: "XPath axis - descendant locators"
+    ├─ Test 4: "XPath axes - following & preceding"
+    ├─ Test 5: "XPath logical operators - AND/OR"
+    ├─ Test 6: "XPath functions - text matching"
+    ├─ Test 7: "XPath functions - contains & starts-with"
+    ├─ Test 8: "XPath functions - normalize-space"
+    ├─ Test 9: "XPath position functions"
+    ├─ Test 10: "XPath count functions"
+    ├─ Test 11: "XPath complex selectors"
+    ├─ Test 12: "XPath best practices"
+    ├─ Test 13: "XPath vs CSS selectors"
+    ├─ Test 14: "XPath real-world examples"
+    ├─ Test 15: "XPath debugging strategies"
+    ├─ Test 16: "Advanced XPath patterns"
+    └─ Test 17: "XPath performance considerations"
+
+Test Queue Created:
+    Queue: [Test1, Test2, Test3, ..., Test17]
+
+TIMELINE:
+t=1000ms File system scan starts
+t=1100ms pw_xpath.spec.ts found
+t=1200ms File loaded and compiled
+t=1300ms Tests parsed and registered (17 tests found)
+t=1400ms Test queue created and validated
+t=1500ms Discovery complete
+
+
+================================================================================
+STAGE 4: WORKER POOL SETUP (1.5s - 3s)
+================================================================================
+
+WHAT HAPPENS:
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Playwright spawns worker processes and initializes them                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Worker Count Determination:
+    Config: workers: undefined
+    CPU cores: 6
+    Workers to spawn: 6
+
+Worker Process Creation:
+    For each worker (1-6):
+    
+    t=1500ms Worker 1 process spawned
+    t=1600ms Worker 2 process spawned
+    t=1700ms Worker 3 process spawned
+    t=1800ms Worker 4 process spawned
+    t=1900ms Worker 5 process spawned
+    t=2000ms Worker 6 process spawned
+
+Each Worker Initialization:
+    Per worker (happens in parallel):
+    
+    1. Worker process starts
+    2. Load Playwright libraries
+    3. Initialize browser launcher (Chromium)
+    4. Prepare for test execution
+    5. Wait for test assignment
+
+Worker Pool Status:
+    t=2100ms All 6 workers initialized
+    
+    ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+    │ Worker 1 │ │ Worker 2 │ │ Worker 3 │ │ Worker 4 │ │ Worker 5 │ │ Worker 6 │
+    │ READY    │ │ READY    │ │ READY    │ │ READY    │ │ READY    │ │ READY    │
+    └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+
+TIMELINE:
+t=1500ms Worker pool initialization starts
+t=2100ms All 6 workers initialized and READY
+t=2500ms Ready to start test execution
+
+
+================================================================================
+STAGE 5: TEST EXECUTION (2.5s - variable end time)
+================================================================================
+
+WHAT HAPPENS:
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Tests are distributed to workers and executed in parallel                  │
+└────────────────────────────────────────────────────────────────────────────┘
+
+INITIAL DISTRIBUTION (t=2500ms):
+
+    Queue: [Test1, Test2, Test3, Test4, Test5, Test6, Test7, ... Test17]
+    
+    Workers grab tests:
+    ├─ Worker 1 ← Test 1: "XPath locators - introduction"
+    ├─ Worker 2 ← Test 2: "XPath axis - ancestor locators"
+    ├─ Worker 3 ← Test 3: "XPath axis - descendant locators"
+    ├─ Worker 4 ← Test 4: "XPath axes - following & preceding"
+    ├─ Worker 5 ← Test 5: "XPath logical operators - AND/OR"
+    └─ Worker 6 ← Test 6: "XPath functions - text matching"
+
+    Remaining in queue: [Test7, Test8, Test9, ... Test17]
+
+
+EXECUTION WITHIN A SINGLE TEST:
+
+Let's follow Worker 1 running Test 1 in detail:
+
+    t=2500ms Test 1 execution STARTS
+    
+    Step 1: Launch Browser (t=2500-2800ms)
+    ├─ Initialize browser context
+    ├─ Launch Chromium process
+    ├─ Create new page/context
+    └─ Browser is READY
+    
+    Step 2: Test Setup Hooks (t=2800-2900ms)
+    ├─ Run test.beforeEach() hooks (if any)
+    ├─ Run test.beforeAll() hooks (if any)
+    ├─ Initialize fixtures
+    └─ TEST CONTEXT READY
+    
+    Step 3: Navigate to Base URL (t=2900-3100ms)
+    ├─ page.goto('https://demo.nopcommerce.com/')
+    ├─ Wait for page load
+    ├─ Wait for network to settle
+    └─ PAGE LOADED
+    
+    Step 4: Run Test Logic (t=3100-3300ms)
+    ├─ Execute test code:
+    │  await page.locator('xpath selector').click();
+    ├─ Perform assertions:
+    │  expect(element).toBeVisible();
+    ├─ Handle async operations
+    └─ TEST LOGIC COMPLETE
+    
+    Step 5: Teardown Hooks (t=3300-3400ms)
+    ├─ Run test.afterEach() hooks (if any)
+    ├─ Run test.afterAll() hooks (if any)
+    ├─ Clean up fixtures
+    └─ TEARDOWN COMPLETE
+    
+    Step 6: Result Recording (t=3400ms)
+    ├─ Test result: PASSED
+    ├─ Duration: ~900ms
+    └─ Test 1 COMPLETE
+    
+    t=3400ms Worker 1 is now IDLE, grabs Test 7 from queue
+
+
+PARALLEL EXECUTION TIMELINE:
+
+    t=2500ms  Start          W1(T1)  W2(T2)  W3(T3)  W4(T4)  W5(T5)  W6(T6)
+    t=3400ms  ↓              W1 IDLE
+    t=3500ms  T1 done        W1(T7)  W2(T2)  W3(T3)  W4(T4)  W5(T5)  W6(T6)
+    t=4100ms  ↓              W1 IDLE
+    t=4200ms  T2 done             W2 IDLE
+    t=4300ms  T7 done        W1(T13) W2(T8)  W3(T3)  W4(T4)  W5(T5)  W6(T6)
+    t=4800ms  ↓              W1 IDLE
+    t=4900ms  T3 done             W3 IDLE
+    t=5000ms  T4 done             W4 IDLE
+    t=5100ms  T5 done             W5 IDLE
+    t=5200ms  T6 done             W6 IDLE
+    
+    Final:    All 17 tests complete
+
+Execution statistics:
+    Total tests: 17
+    Workers: 6
+    Batches: 3 (6 + 6 + 5)
+    Average per test: ~900ms
+    Total time: ~2.7 seconds (from first test start to last test end)
+
+
+PARALLEL EXECUTION VISUALIZATION:
+
+    Time →
+    0s   ├─ Worker 1: [Test1  (900ms)][Test7  (800ms)][Test13 (850ms)]
+         ├─ Worker 2: [Test2  (1000ms)][Test8  (900ms)]
+         ├─ Worker 3: [Test3  (950ms) ][Test9  (850ms)]
+         ├─ Worker 4: [Test4  (1200ms)][Test10 (700ms)]
+         ├─ Worker 5: [Test5  (850ms) ][Test11 (950ms)]
+         └─ Worker 6: [Test6  (1100ms)][Test12 (800ms)]
+    
+    2.7s ← All tests complete
+
+
+TEST EXECUTION DETAILS (SINGLE TEST):
+
+For Test 1: "XPath locators - introduction"
+
+    Code:
+    ┌────────────────────────────────────────────────────────────────┐
+    │ test('XPath locators - introduction', async ({page}) => {     │
+    │   await page.goto('https://demowebshop.tricentis.com/');      │
+    │                                                                 │
+    │   console.log('Testing XPath locators...');                    │
+    │                                                                 │
+    │   const link = page.locator('//a[@class="product-link"]');    │
+    │   await expect(link).toBeVisible();                            │
+    │                                                                 │
+    │   const count = await link.count();                            │
+    │   console.log(`Found ${count} product links`);                 │
+    │ });                                                             │
+    └────────────────────────────────────────────────────────────────┘
+
+    Execution trace:
+    t=2500ms  Browser launched
+    t=2800ms  Page created
+    t=2900ms  Navigate to baseURL
+    t=3100ms  Page loaded, DOM ready
+    t=3150ms  Evaluate: page.locator('//a[@class="product-link"]')
+    t=3200ms  Wait for element visibility (timeout: 5s)
+    t=3220ms  Element found, visible
+    t=3250ms  Count elements: result = 42
+    t=3300ms  Console.log executes
+    t=3350ms  Browser closes
+    t=3400ms  Test result recorded as PASSED
+
+
+TIMELINE:
+t=2500ms Test execution begins (Stage 5 starts)
+t=3400ms Test 1 complete
+t=3500ms Test 2 complete
+t=4200ms Test 8 complete (Worker 2 idle)
+t=5200ms Last test complete (Worker 6)
+
+
+================================================================================
+STAGE 6: RESULT REPORTING (variable - typically 5500ms)
+================================================================================
+
+WHAT HAPPENS:
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Playwright aggregates results and generates reports                        │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Result Collection (t=5200-5300ms):
+    1. Wait for all workers to complete
+    2. Collect results from each worker:
+       ├─ Test name
+       ├─ Status (passed/failed)
+       ├─ Duration
+       ├─ Error messages (if any)
+       ├─ Screenshots
+       ├─ Videos (if enabled)
+       └─ Trace files (if enabled)
+    
+    Total results:
+    ├─ Passed: 17
+    ├─ Failed: 0
+    ├─ Skipped: 0
+    └─ Flaky: 0
+
+Console Output (t=5300-5400ms):
+    
+    Display to user:
+    ┌─────────────────────────────────────────────────────────────┐
+    │ Running 17 tests using 6 workers                            │
+    │                                                              │
+    │  ✓ [chromium] › pw_xpath.spec.ts:10 (900ms)                 │
+    │  ✓ [chromium] › pw_xpath.spec.ts:25 (1000ms)                │
+    │  ✓ [chromium] › pw_xpath.spec.ts:40 (950ms)                 │
+    │  ✓ [chromium] › pw_xpath.spec.ts:55 (1200ms)                │
+    │  ... (13 more tests)                                        │
+    │                                                              │
+    │ 17 passed (5.2s)                                            │
+    └─────────────────────────────────────────────────────────────┘
+
+HTML Report Generation (t=5400-5500ms):
+    1. Create playwright-report/ directory
+    2. Generate index.html with results
+    3. Create test detail pages
+    4. Embed screenshots/videos
+    5. Generate timeline visualization
+    
+    Files created:
+    ├─ playwright-report/index.html
+    ├─ playwright-report/data/
+    ├─ playwright-report/resources/
+    └─ test-results/ (detailed logs)
+
+TIMELINE:
+t=5200ms All tests complete, result collection starts
+t=5300ms Results aggregated
+t=5400ms Console output displayed
+t=5500ms HTML report generated
+t=5600ms Reporting complete
+
+
+================================================================================
+STAGE 7: CLEANUP & EXIT (5600ms - end)
+================================================================================
+
+WHAT HAPPENS:
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Playwright cleans up resources and exits                                   │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Worker Shutdown (t=5600-5700ms):
+    For each worker (1-6):
+    1. Gracefully terminate browser process
+    2. Close connections
+    3. Release memory
+    4. Terminate worker process
+    
+    Status per worker:
+    ├─ Worker 1: Browser closed, memory released
+    ├─ Worker 2: Browser closed, memory released
+    ├─ Worker 3: Browser closed, memory released
+    ├─ Worker 4: Browser closed, memory released
+    ├─ Worker 5: Browser closed, memory released
+    └─ Worker 6: Browser closed, memory released
+
+Process Cleanup (t=5700-5750ms):
+    1. Close test runner process
+    2. Release worker pool
+    3. Release configuration objects
+    4. Clear test registry
+    5. Release memory
+
+Exit Code Determination (t=5750ms):
+    if (all tests passed) {
+      exitCode = 0  // Success
+    } else {
+      exitCode = 1  // Failure
+    }
+    
+    In your case: exitCode = 0 (all 17 passed)
+
+Final Output (t=5800ms):
+    $ npx playwright test pw_xpath.spec.ts
+    ... (test output) ...
+    17 passed (5.2s)
+    
+    $  ← Command prompt returns (exit code 0)
+
+TIMELINE:
+t=5600ms Cleanup begins
+t=5700ms All workers terminated
+t=5750ms Process shutdown
+t=5800ms Exit code returned
+t=5800ms Command complete
+
+
+================================================================================
+DETAILED TIMING ANALYSIS
+================================================================================
+
+FULL EXECUTION TIMELINE:
+
+    t=0ms     ─ User types command
+    t=100ms   ├─ NPX resolves package
+    t=200ms   │
+    t=300ms   ├─ CLI loaded
+    t=500ms   │
+    t=600ms   ├─ Config file located
+    t=700ms   ├─ Config compiled
+    t=800ms   ├─ CPU detected (6 cores)
+    t=1000ms  │
+    t=1100ms  ├─ Test file found (pw_xpath.spec.ts)
+    t=1200ms  ├─ File compiled
+    t=1300ms  ├─ 17 tests parsed
+    t=1500ms  │
+    t=1600ms  ├─ 6 workers spawned
+    t=2100ms  ├─ Workers initialized
+    t=2500ms  │
+    t=2500ms  ├─ Test execution starts
+    t=3400ms  ├─ Tests progressing
+    t=4000ms  ├─ More tests complete
+    t=5200ms  ├─ Last test finishes
+    t=5300ms  │
+    t=5400ms  ├─ Results aggregated
+    t=5500ms  ├─ HTML report generated
+    t=5700ms  │
+    t=5750ms  ├─ Workers shutdown
+    t=5800ms  └─ Process exits (code 0)
+
+BREAKDOWN:
+    ├─ Setup (0-500ms): 500ms
+    ├─ Config (500ms-1s): 500ms
+    ├─ Discovery (1s-1.5s): 500ms
+    ├─ Worker init (1.5s-2.5s): 1000ms
+    ├─ Execution (2.5s-5.2s): 2700ms ← Actual test time
+    ├─ Reporting (5.2s-5.5s): 300ms
+    ├─ Cleanup (5.5s-5.8s): 300ms
+    └─ TOTAL: 5.8 seconds
+
+
+RESOURCE USAGE DURING EXECUTION:
+
+    Memory:
+    ├─ Before tests: ~100MB (CLI + config)
+    ├─ During setup: ~200MB (added workers)
+    ├─ During exec: ~2.4GB (6 browsers running)
+    └─ After tests: ~50MB (back to baseline)
+
+    CPU:
+    ├─ Discovery: ~30% (file scanning, parsing)
+    ├─ Execution: ~80-100% (6 parallel browsers)
+    └─ Reporting: ~20% (aggregating results)
+
+    Disk:
+    ├─ Config read: ~5KB
+    ├─ Test file read: ~50KB
+    ├─ Report written: ~500KB
+    └─ Total: ~555KB
+
+
+================================================================================
+COMMON EXECUTION PATTERNS
+================================================================================
+
+PATTERN 1: All Tests Pass
+────────────────────────
+
+Command:
+    npx playwright test pw_xpath.spec.ts
+
+Expected output:
+    ✓ [chromium] › pw_xpath.spec.ts:10 (900ms)
+    ✓ [chromium] › pw_xpath.spec.ts:25 (1000ms)
+    ... (all tests with ✓)
+    
+    17 passed (5.2s)
+
+Exit code: 0
+Next step: Command prompt returns
+
+
+PATTERN 2: Some Tests Fail
+──────────────────────────
+
+Command:
+    npx playwright test pw_xpath.spec.ts
+
+Output:
+    ✓ [chromium] › pw_xpath.spec.ts:10 (900ms)
+    ✗ [chromium] › pw_xpath.spec.ts:25 (1200ms)
+    ┌─────────────────────────────────────────┐
+    │ Error: Timeout waiting for locator      │
+    └─────────────────────────────────────────┘
+    ... (more results)
+    
+    15 passed, 2 failed (5.8s)
+
+Exit code: 1
+Next step: HTML report generated for debugging
+
+
+PATTERN 3: Retry on Failure
+───────────────────────────
+
+If retries configured (retries: 2):
+
+Command:
+    npx playwright test pw_xpath.spec.ts
+
+Output (flaky test):
+    ✓ [chromium] › pw_xpath.spec.ts:10 (900ms)
+    ✗ [chromium] › pw_xpath.spec.ts:25 (1200ms)
+    ✓ [chromium] › pw_xpath.spec.ts:25 (attempt 2) (1100ms)  ← Retried
+    ... (more results)
+    
+    17 passed, 2 flaky (6.5s)
+
+Exit code: 0 (flaky tests still considered passed if eventually pass)
+
+
+PATTERN 4: Single Worker Execution
+──────────────────────────────────
+
+Command:
+    npx playwright test pw_xpath.spec.ts --workers=1
+
+Execution:
+    ├─ t=2500ms: Test 1 starts
+    ├─ t=3400ms: Test 1 done, Test 2 starts
+    ├─ t=4400ms: Test 2 done, Test 3 starts
+    ├─ ...
+    └─ t=17000ms: Test 17 done
+
+Result:
+    17 passed (14.5s)  ← Much slower (sequential)
+
+
+PATTERN 5: Specific Test Only
+────────────────────────────
+
+Command:
+    npx playwright test pw_xpath.spec.ts -g "XPath locators - introduction"
+
+Execution:
+    ├─ Loads pw_xpath.spec.ts
+    ├─ Filters to matching test
+    ├─ Runs only 1 test
+    └─ Result: 1 passed (1.2s)
+
+Exit code: 0
+
+
+PATTERN 6: Debug Mode
+────────────────────
+
+Command:
+    npx playwright test pw_xpath.spec.ts --debug
+
+Changes:
+    ├─ Workers: 1 (sequential for clarity)
+    ├─ Headless: false (browser visible)
+    ├─ Timeout: 0 (unlimited)
+    ├─ Opens Inspector
+    └─ Manual control over test stepping
+
+
+================================================================================
+INTERNAL PROCESS ARCHITECTURE
+================================================================================
+
+PROCESS HIERARCHY:
+
+    Main Process (CLI)
+    ├─ Reads config
+    ├─ Discovers tests
+    ├─ Manages worker pool
+    └─ Aggregates results
+    
+    Worker Process 1          Worker Process 2          ...
+    ├─ Browser Instance 1     ├─ Browser Instance 2
+    ├─ Page contexts          ├─ Page contexts
+    └─ Test execution         └─ Test execution
+    
+    IPC (Inter-Process Communication)
+    ├─ Main sends test to Worker
+    ├─ Worker sends result back
+    └─ Continuous throughout execution
+
+COMMUNICATION FLOW:
+
+    Main Process                          Worker Process
+    ─────────────────────────────────────────────────────
+    1. Spawns worker                      Worker starts
+    2. Sends config                   →   Worker loads config
+    3. Sends Test 1                   →   Worker runs Test 1
+    4. Waits for result               ←   Worker sends result
+    5. Sends Test 7                   →   Worker runs Test 7
+    6. Waits for result               ←   Worker sends result
+    7. Cleanup signal                 →   Worker cleans up
+    8. Waits for termination          ←   Worker exits
+
+
+================================================================================
+FILE STRUCTURE DURING EXECUTION
+================================================================================
+
+Before execution:
+    c:\playwrightTutorials\
+    ├─ tests/
+    │  ├─ pw_xpath.spec.ts
+    │  ├─ pw_csslocators.spec.ts
+    │  └─ ...
+    ├─ playwright.config.ts
+    └─ node_modules/
+
+During execution:
+    c:\playwrightTutorials\
+    ├─ tests/
+    │  └─ pw_xpath.spec.ts
+    ├─ playwright.config.ts
+    ├─ node_modules/
+    ├─ test-results/        ← Created (live updates)
+    │  ├─ pw_xpath-chromium
+    │  │  ├─ video.webm
+    │  │  ├─ trace.zip
+    │  │  └─ test-finished.json
+    │  └─ ...
+    └─ playwright-report/   ← Created (updated at end)
+       ├─ index.html
+       ├─ data/
+       └─ resources/
+
+After execution:
+    Results saved:
+    ├─ test-results/ (detailed artifacts)
+    └─ playwright-report/ (HTML report)
+
+
+================================================================================
+SUMMARY OF EXECUTION STAGES
+================================================================================
+
+Stage 1: Command Execution (500ms)
+  └─ NPX resolves Playwright, spawns CLI
+
+Stage 2: Configuration (500ms)
+  └─ Loads playwright.config.ts, detects 6 cores
+
+Stage 3: Discovery (500ms)
+  └─ Finds pw_xpath.spec.ts, discovers 17 tests
+
+Stage 4: Worker Setup (1000ms)
+  └─ Spawns 6 worker processes, initializes them
+
+Stage 5: Execution (2700ms)
+  └─ Tests run in parallel across 6 workers
+
+Stage 6: Reporting (300ms)
+  └─ Aggregates results, generates HTML report
+
+Stage 7: Cleanup (300ms)
+  └─ Shuts down workers, exits with code 0
+
+TOTAL TIME: ~5800ms (~5.8 seconds)
+
+
+================================================================================
+KEY TAKEAWAYS
+================================================================================
+
+1. Command triggers NPX which spawns Playwright CLI
+   → All happens automatically, transparently
+
+2. Configuration loads and auto-detects CPU cores
+   → Determines worker count (6 in your case)
+
+3. Tests are discovered and queued
+   → 17 tests found in pw_xpath.spec.ts
+
+4. Worker pool is created and initialized
+   → 6 independent browser processes ready
+
+5. Tests are distributed via FIFO queue
+   → Workers grab tests as they finish previous ones
+
+6. Parallel execution is the default
+   → 6 tests run simultaneously per batch
+
+7. Results are aggregated and reported
+   → HTML report generated, console output displayed
+
+8. Resources are cleaned up
+   → Workers shut down, memory released, exit code returned
+
+The entire process is highly orchestrated with careful process management,
+inter-process communication, and resource tracking.
+
+================================================================================
+END OF TUTORIAL
+================================================================================
+
+Document version: 1.0
+Last updated: December 2025
+Complexity: Intermediate to Advanced
+
+For understanding:
+- Complete configuration: playwright.config.ts
+- Test structure: tests/pw_xpath.spec.ts
+- Execution result: playwright-report/index.html

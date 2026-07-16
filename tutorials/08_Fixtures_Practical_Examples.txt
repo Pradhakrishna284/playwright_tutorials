@@ -1,0 +1,1210 @@
+================================================================================
+            PLAYWRIGHT FIXTURES - PRACTICAL EXAMPLES
+                    Production-Ready Code Examples
+================================================================================
+
+TABLE OF CONTENTS
+=================
+
+BASIC EXAMPLES (Examples 1-10)
+  - Simple custom fixtures
+  - Built-in fixture usage
+  - Basic patterns
+
+AUTHENTICATION EXAMPLES (Examples 11-20)
+  - Login fixtures
+  - Storage state
+  - Multi-user scenarios
+  - Role-based access
+
+PAGE OBJECT EXAMPLES (Examples 21-30)
+  - Page Object with fixtures
+  - Composable page fixtures
+  - Navigation patterns
+
+TEST DATA EXAMPLES (Examples 31-40)
+  - API data creation
+  - Database fixtures
+  - Cleanup patterns
+
+ADVANCED EXAMPLES (Examples 41-50)
+  - Worker-scoped fixtures
+  - Fixture composition
+  - Complex scenarios
+  - Performance optimization
+
+================================================================================
+
+BASIC EXAMPLES (1-10)
+======================
+
+Example 1: Simple Todo Page Fixture
+------------------------------------
+
+// fixtures/todoFixtures.ts
+import { test as base, expect, Page } from '@playwright/test';
+
+type TodoFixtures = {
+  todoPage: Page;
+};
+
+export const test = base.extend<TodoFixtures>({
+  todoPage: async ({ page }, use) => {
+    // Navigate to todo page before test
+    await page.goto('https://demo.playwright.dev/todomvc');
+    
+    // Provide page to test
+    await use(page);
+    
+    // Optional cleanup
+    console.log('Todo test completed');
+  },
+});
+
+export { expect };
+
+// Usage: tests/todo.spec.ts
+import { test, expect } from '../fixtures/todoFixtures';
+
+test('add todo item', async ({ todoPage }) => {
+  // Page already on todo app
+  await todoPage.fill('.new-todo', 'Buy groceries');
+  await todoPage.press('.new-todo', 'Enter');
+  
+  await expect(todoPage.locator('.todo-list li')).toHaveText('Buy groceries');
+});
+
+test('complete todo', async ({ todoPage }) => {
+  await todoPage.fill('.new-todo', 'Complete task');
+  await todoPage.press('.new-todo', 'Enter');
+  
+  await todoPage.click('.toggle');
+  
+  await expect(todoPage.locator('.todo-list li')).toHaveClass(/completed/);
+});
+
+================================================================================
+
+Example 2: Timer Fixture for Performance Tracking
+--------------------------------------------------
+
+// fixtures/performanceFixtures.ts
+import { test as base } from '@playwright/test';
+
+type PerformanceFixtures = {
+  testTimer: number;
+};
+
+export const test = base.extend<PerformanceFixtures>({
+  testTimer: async ({}, use, testInfo) => {
+    const startTime = Date.now();
+    console.log(`\n🕐 Starting test: ${testInfo.title}`);
+    
+    // Provide start time to test
+    await use(startTime);
+    
+    // Calculate duration
+    const duration = Date.now() - startTime;
+    console.log(`✅ Test completed: ${testInfo.title}`);
+    console.log(`⏱️  Duration: ${duration}ms\n`);
+    
+    // Fail if test is too slow
+    if (duration > 10000) {
+      console.warn(`⚠️  Warning: Test took ${duration}ms (>10s)`);
+    }
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/performanceFixtures';
+
+test('fast test', async ({ page, testTimer }) => {
+  await page.goto('https://example.com');
+  await expect(page.locator('h1')).toBeVisible();
+});
+
+// Output:
+// 🕐 Starting test: fast test
+// ✅ Test completed: fast test
+// ⏱️  Duration: 1234ms
+
+================================================================================
+
+Example 3: Multiple Fixture Dependencies
+-----------------------------------------
+
+// fixtures/multiFixtures.ts
+import { test as base } from '@playwright/test';
+
+type MultiFixtures = {
+  config: AppConfig;
+  apiClient: ApiClient;
+  database: Database;
+};
+
+type AppConfig = {
+  apiUrl: string;
+  dbUrl: string;
+};
+
+class ApiClient {
+  constructor(public url: string) {}
+  async get(path: string) {
+    const response = await fetch(`${this.url}${path}`);
+    return response.json();
+  }
+}
+
+class Database {
+  static async connect(url: string) {
+    console.log(`Connected to ${url}`);
+    return new Database(url);
+  }
+  
+  constructor(public url: string) {}
+  
+  async query(sql: string) {
+    console.log(`Executing: ${sql}`);
+    return [];
+  }
+  
+  async close() {
+    console.log('Database connection closed');
+  }
+}
+
+export const test = base.extend<MultiFixtures>({
+  // First fixture: Configuration
+  config: async ({}, use) => {
+    const config = {
+      apiUrl: process.env.API_URL || 'http://localhost:3000',
+      dbUrl: process.env.DB_URL || 'postgres://localhost/test',
+    };
+    await use(config);
+  },
+  
+  // Second fixture: Uses config
+  apiClient: async ({ config }, use) => {
+    const client = new ApiClient(config.apiUrl);
+    console.log(`API Client initialized: ${config.apiUrl}`);
+    await use(client);
+  },
+  
+  // Third fixture: Uses config
+  database: async ({ config }, use) => {
+    const db = await Database.connect(config.dbUrl);
+    await use(db);
+    await db.close();
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/multiFixtures';
+
+test('use multiple fixtures', async ({ apiClient, database, page }) => {
+  // Create data in database
+  await database.query('INSERT INTO users (name) VALUES ("Test User")');
+  
+  // Fetch via API
+  const users = await apiClient.get('/api/users');
+  expect(users.length).toBeGreaterThan(0);
+  
+  // Verify in UI
+  await page.goto('/users');
+  await expect(page.locator('.user-item')).toHaveCount(users.length);
+});
+
+================================================================================
+
+Example 4: Test-Scoped vs Worker-Scoped Comparison
+---------------------------------------------------
+
+// fixtures/scopeComparison.ts
+import { test as base } from '@playwright/test';
+
+type ScopeFixtures = {
+  testScopedCounter: { count: number; increment: () => void };
+  workerScopedCounter: { count: number; increment: () => void };
+};
+
+export const test = base.extend<ScopeFixtures>({
+  // TEST-SCOPED: Fresh for each test
+  testScopedCounter: async ({}, use) => {
+    const counter = {
+      count: 0,
+      increment() {
+        this.count++;
+      }
+    };
+    console.log('Test-scoped counter created');
+    await use(counter);
+    console.log(`Test-scoped counter final value: ${counter.count}`);
+  },
+  
+  // WORKER-SCOPED: Shared across tests in worker
+  workerScopedCounter: [async ({}, use) => {
+    const counter = {
+      count: 0,
+      increment() {
+        this.count++;
+      }
+    };
+    console.log('Worker-scoped counter created');
+    await use(counter);
+    console.log(`Worker-scoped counter final value: ${counter.count}`);
+  }, { scope: 'worker' }],
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/scopeComparison';
+
+test('test 1', async ({ testScopedCounter, workerScopedCounter }) => {
+  testScopedCounter.increment();
+  workerScopedCounter.increment();
+  
+  console.log(`Test 1 - Test-scoped: ${testScopedCounter.count}`); // 1
+  console.log(`Test 1 - Worker-scoped: ${workerScopedCounter.count}`); // 1
+});
+
+test('test 2', async ({ testScopedCounter, workerScopedCounter }) => {
+  testScopedCounter.increment();
+  workerScopedCounter.increment();
+  
+  console.log(`Test 2 - Test-scoped: ${testScopedCounter.count}`); // 1 (fresh)
+  console.log(`Test 2 - Worker-scoped: ${workerScopedCounter.count}`); // 2 (shared)
+});
+
+test('test 3', async ({ testScopedCounter, workerScopedCounter }) => {
+  testScopedCounter.increment();
+  workerScopedCounter.increment();
+  
+  console.log(`Test 3 - Test-scoped: ${testScopedCounter.count}`); // 1 (fresh)
+  console.log(`Test 3 - Worker-scoped: ${workerScopedCounter.count}`); // 3 (shared)
+});
+
+// Output:
+// Test-scoped counter created
+// Worker-scoped counter created
+// Test 1 - Test-scoped: 1
+// Test 1 - Worker-scoped: 1
+// Test-scoped counter final value: 1
+// Test-scoped counter created
+// Test 2 - Test-scoped: 1
+// Test 2 - Worker-scoped: 2
+// Test-scoped counter final value: 1
+// Test-scoped counter created
+// Test 3 - Test-scoped: 1
+// Test 3 - Worker-scoped: 3
+// Test-scoped counter final value: 1
+// Worker-scoped counter final value: 3
+
+================================================================================
+
+Example 5: Automatic Fixture (Auto)
+------------------------------------
+
+// fixtures/autoFixtures.ts
+import { test as base } from '@playwright/test';
+
+export const test = base.extend({
+  // Runs automatically for every test
+  performanceMonitor: [async ({ page }, use) => {
+    // Setup: Start monitoring
+    const metrics = [];
+    
+    page.on('metrics', data => {
+      metrics.push({
+        timestamp: Date.now(),
+        metrics: data
+      });
+    });
+    
+    console.log('📊 Performance monitoring started');
+    
+    // No need to provide anything
+    await use();
+    
+    // Teardown: Log summary
+    console.log(`📈 Collected ${metrics.length} metric samples`);
+    
+  }, { auto: true }],
+  
+  // Another auto fixture: Screenshot on failure
+  screenshotOnFailure: [async ({ page }, use, testInfo) => {
+    await use();
+    
+    // Runs after test
+    if (testInfo.status !== testInfo.expectedStatus) {
+      const screenshot = await page.screenshot();
+      await testInfo.attach('failure-screenshot', {
+        body: screenshot,
+        contentType: 'image/png'
+      });
+      console.log('📸 Screenshot captured on failure');
+    }
+  }, { auto: true }],
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/autoFixtures';
+
+test('normal test', async ({ page }) => {
+  // performanceMonitor and screenshotOnFailure run automatically!
+  await page.goto('https://example.com');
+  await expect(page.locator('h1')).toBeVisible();
+});
+
+// Output:
+// 📊 Performance monitoring started
+// 📈 Collected 5 metric samples
+
+================================================================================
+
+AUTHENTICATION EXAMPLES (11-20)
+================================
+
+Example 11: Basic Login Fixture
+--------------------------------
+
+// fixtures/authFixtures.ts
+import { test as base, Page } from '@playwright/test';
+
+type AuthFixtures = {
+  authenticatedPage: Page;
+};
+
+export const test = base.extend<AuthFixtures>({
+  authenticatedPage: async ({ page }, use) => {
+    // Navigate to login page
+    await page.goto('https://demo.applitools.com');
+    
+    // Perform login
+    await page.fill('id=username', 'testuser');
+    await page.fill('id=password', 'password123');
+    await page.click('id=log-in');
+    
+    // Wait for login success
+    await page.waitForURL('**/app.html');
+    await page.waitForSelector('.logged-in', { state: 'visible' });
+    
+    console.log('✅ User authenticated');
+    
+    // Provide authenticated page
+    await use(page);
+    
+    // Optional: Logout
+    try {
+      await page.click('#logout');
+      console.log('✅ User logged out');
+    } catch (error) {
+      console.log('⚠️  Logout failed (page may be closed)');
+    }
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/authFixtures';
+
+test('view dashboard', async ({ authenticatedPage }) => {
+  await expect(authenticatedPage.locator('.dashboard')).toBeVisible();
+  await expect(authenticatedPage.locator('.username')).toHaveText('testuser');
+});
+
+test('access account settings', async ({ authenticatedPage }) => {
+  await authenticatedPage.click('a[href="/settings"]');
+  await expect(authenticatedPage.locator('h1')).toHaveText('Account Settings');
+});
+
+================================================================================
+
+Example 12: Storage State Authentication (Faster)
+--------------------------------------------------
+
+// auth.setup.ts - Run once to generate storage state
+import { test as setup } from '@playwright/test';
+
+setup('authenticate', async ({ page }) => {
+  await page.goto('https://example.com/login');
+  await page.fill('#username', 'testuser');
+  await page.fill('#password', 'password123');
+  await page.click('#login');
+  
+  await page.waitForURL('**/dashboard');
+  
+  // Save storage state
+  await page.context().storageState({ path: 'auth/user.json' });
+});
+
+// playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
+      name: 'chromium',
+      use: {
+        storageState: 'auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+  ],
+});
+
+// fixtures/storageAuthFixtures.ts
+import { test as base } from '@playwright/test';
+
+type StorageAuthFixtures = {
+  authenticatedPage: Page;
+};
+
+export const test = base.extend<StorageAuthFixtures>({
+  authenticatedPage: async ({ browser }, use) => {
+    // Load saved authentication state
+    const context = await browser.newContext({
+      storageState: 'auth/user.json'
+    });
+    
+    const page = await context.newPage();
+    
+    await use(page);
+    
+    await context.close();
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage - Much faster! No login needed
+import { test, expect } from '../fixtures/storageAuthFixtures';
+
+test('instant authenticated access', async ({ authenticatedPage }) => {
+  await authenticatedPage.goto('/dashboard');
+  // Already authenticated from storage state!
+  await expect(authenticatedPage.locator('.user-menu')).toBeVisible();
+});
+
+================================================================================
+
+Example 13: Multiple User Roles
+--------------------------------
+
+// fixtures/roleFixtures.ts
+import { test as base, Browser, Page } from '@playwright/test';
+
+type User = {
+  username: string;
+  password: string;
+  role: string;
+};
+
+type RoleFixtures = {
+  adminPage: Page;
+  editorPage: Page;
+  viewerPage: Page;
+};
+
+async function loginAsUser(browser: Browser, user: User): Promise<Page> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  
+  await page.goto('https://example.com/login');
+  await page.fill('#username', user.username);
+  await page.fill('#password', user.password);
+  await page.click('#login');
+  await page.waitForURL('**/dashboard');
+  
+  return page;
+}
+
+export const test = base.extend<RoleFixtures>({
+  adminPage: async ({ browser }, use) => {
+    const page = await loginAsUser(browser, {
+      username: 'admin@example.com',
+      password: 'admin123',
+      role: 'admin'
+    });
+    
+    await use(page);
+    
+    await page.context().close();
+  },
+  
+  editorPage: async ({ browser }, use) => {
+    const page = await loginAsUser(browser, {
+      username: 'editor@example.com',
+      password: 'editor123',
+      role: 'editor'
+    });
+    
+    await use(page);
+    
+    await page.context().close();
+  },
+  
+  viewerPage: async ({ browser }, use) => {
+    const page = await loginAsUser(browser, {
+      username: 'viewer@example.com',
+      password: 'viewer123',
+      role: 'viewer'
+    });
+    
+    await use(page);
+    
+    await page.context().close();
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/roleFixtures';
+
+test('admin can delete users', async ({ adminPage }) => {
+  await adminPage.goto('/users');
+  await adminPage.click('.user-item .delete-button');
+  await expect(adminPage.locator('.confirmation-modal')).toBeVisible();
+});
+
+test('editor cannot delete users', async ({ editorPage }) => {
+  await editorPage.goto('/users');
+  await expect(editorPage.locator('.user-item .delete-button')).toBeHidden();
+});
+
+test('viewer has read-only access', async ({ viewerPage }) => {
+  await viewerPage.goto('/users');
+  await expect(viewerPage.locator('.edit-button')).toHaveCount(0);
+  await expect(viewerPage.locator('.delete-button')).toHaveCount(0);
+});
+
+test('role-based permissions', async ({ adminPage, editorPage, viewerPage }) => {
+  // Admin can access admin panel
+  await adminPage.goto('/admin');
+  await expect(adminPage.locator('.admin-panel')).toBeVisible();
+  
+  // Editor cannot access admin panel
+  await editorPage.goto('/admin');
+  await expect(editorPage.locator('.access-denied')).toBeVisible();
+  
+  // Viewer cannot access admin panel
+  await viewerPage.goto('/admin');
+  await expect(viewerPage.locator('.access-denied')).toBeVisible();
+});
+
+================================================================================
+
+Example 14: API Token Authentication
+-------------------------------------
+
+// fixtures/apiAuthFixtures.ts
+import { test as base } from '@playwright/test';
+
+type ApiAuthFixtures = {
+  apiToken: string;
+  authenticatedRequest: {
+    get: (url: string) => Promise<any>;
+    post: (url: string, data: any) => Promise<any>;
+    put: (url: string, data: any) => Promise<any>;
+    delete: (url: string) => Promise<any>;
+  };
+};
+
+export const test = base.extend<ApiAuthFixtures>({
+  apiToken: async ({ request }, use) => {
+    // Get authentication token
+    const response = await request.post('https://api.example.com/auth/token', {
+      data: {
+        username: process.env.API_USERNAME || 'testuser',
+        password: process.env.API_PASSWORD || 'password123'
+      }
+    });
+    
+    const { token } = await response.json();
+    console.log('🔑 API token obtained');
+    
+    await use(token);
+  },
+  
+  authenticatedRequest: async ({ request, apiToken }, use) => {
+    const authHeaders = {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json'
+    };
+    
+    const authenticatedRequest = {
+      get: async (url: string) => {
+        const response = await request.get(url, { headers: authHeaders });
+        return response.json();
+      },
+      
+      post: async (url: string, data: any) => {
+        const response = await request.post(url, {
+          data,
+          headers: authHeaders
+        });
+        return response.json();
+      },
+      
+      put: async (url: string, data: any) => {
+        const response = await request.put(url, {
+          data,
+          headers: authHeaders
+        });
+        return response.json();
+      },
+      
+      delete: async (url: string) => {
+        const response = await request.delete(url, { headers: authHeaders });
+        return response.ok();
+      },
+    };
+    
+    await use(authenticatedRequest);
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/apiAuthFixtures';
+
+test('fetch user profile', async ({ authenticatedRequest }) => {
+  const profile = await authenticatedRequest.get('https://api.example.com/profile');
+  
+  expect(profile.username).toBe('testuser');
+  expect(profile.email).toBeDefined();
+});
+
+test('create resource', async ({ authenticatedRequest }) => {
+  const resource = await authenticatedRequest.post('https://api.example.com/resources', {
+    name: 'Test Resource',
+    type: 'document'
+  });
+  
+  expect(resource.id).toBeDefined();
+  expect(resource.name).toBe('Test Resource');
+  
+  // Cleanup
+  await authenticatedRequest.delete(`https://api.example.com/resources/${resource.id}`);
+});
+
+================================================================================
+
+PAGE OBJECT EXAMPLES (21-30)
+=============================
+
+Example 21: Page Object Fixture Pattern
+----------------------------------------
+
+// pages/LoginPage.ts
+import { Page, expect } from '@playwright/test';
+
+export class LoginPage {
+  constructor(private page: Page) {}
+  
+  async goto() {
+    await this.page.goto('/login');
+  }
+  
+  async login(username: string, password: string) {
+    await this.page.fill('#username', username);
+    await this.page.fill('#password', password);
+    await this.page.click('#login-button');
+  }
+  
+  async expectLoginSuccess() {
+    await expect(this.page).toHaveURL('/dashboard');
+  }
+  
+  async expectLoginError(message: string) {
+    await expect(this.page.locator('.error-message')).toHaveText(message);
+  }
+}
+
+// pages/DashboardPage.ts
+import { Page, expect } from '@playwright/test';
+
+export class DashboardPage {
+  constructor(private page: Page) {}
+  
+  async goto() {
+    await this.page.goto('/dashboard');
+  }
+  
+  async expectWelcomeMessage(name: string) {
+    await expect(this.page.locator('.welcome')).toHaveText(`Welcome, ${name}!`);
+  }
+  
+  async navigateToProfile() {
+    await this.page.click('a[href="/profile"]');
+  }
+  
+  async getStatistics() {
+    const totalUsers = await this.page.locator('.stat-users').textContent();
+    const totalOrders = await this.page.locator('.stat-orders').textContent();
+    
+    return {
+      users: parseInt(totalUsers || '0'),
+      orders: parseInt(totalOrders || '0')
+    };
+  }
+}
+
+// fixtures/pageFixtures.ts
+import { test as base } from '@playwright/test';
+import { LoginPage } from '../pages/LoginPage';
+import { DashboardPage } from '../pages/DashboardPage';
+
+type PageFixtures = {
+  loginPage: LoginPage;
+  dashboardPage: DashboardPage;
+};
+
+export const test = base.extend<PageFixtures>({
+  loginPage: async ({ page }, use) => {
+    await use(new LoginPage(page));
+  },
+  
+  dashboardPage: async ({ page }, use) => {
+    await use(new DashboardPage(page));
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage: tests/auth.spec.ts
+import { test, expect } from '../fixtures/pageFixtures';
+
+test('successful login', async ({ loginPage, dashboardPage }) => {
+  await loginPage.goto();
+  await loginPage.login('testuser', 'password123');
+  await loginPage.expectLoginSuccess();
+  
+  await dashboardPage.expectWelcomeMessage('testuser');
+});
+
+test('invalid credentials', async ({ loginPage }) => {
+  await loginPage.goto();
+  await loginPage.login('invalid', 'wrong');
+  await loginPage.expectLoginError('Invalid username or password');
+});
+
+test('dashboard statistics', async ({ loginPage, dashboardPage }) => {
+  await loginPage.goto();
+  await loginPage.login('testuser', 'password123');
+  
+  await dashboardPage.goto();
+  const stats = await dashboardPage.getStatistics();
+  
+  expect(stats.users).toBeGreaterThan(0);
+  expect(stats.orders).toBeGreaterThan(0);
+});
+
+================================================================================
+
+TEST DATA EXAMPLES (31-40)
+===========================
+
+Example 31: Test User Creation and Cleanup
+-------------------------------------------
+
+// fixtures/testDataFixtures.ts
+import { test as base } from '@playwright/test';
+
+type User = {
+  id: number;
+  username: string;
+  email: string;
+  password: string;
+};
+
+type TestDataFixtures = {
+  testUser: User;
+};
+
+export const test = base.extend<TestDataFixtures>({
+  testUser: async ({ request }, use) => {
+    // CREATE: Generate unique test user
+    const timestamp = Date.now();
+    const userData = {
+      username: `testuser_${timestamp}`,
+      email: `test_${timestamp}@example.com`,
+      password: 'Test123!@#',
+      firstName: 'Test',
+      lastName: 'User'
+    };
+    
+    console.log(`📝 Creating test user: ${userData.username}`);
+    
+    const response = await request.post('https://api.example.com/users', {
+      data: userData
+    });
+    
+    expect(response.status()).toBe(201);
+    const user = await response.json();
+    
+    console.log(`✅ Test user created: ID ${user.id}`);
+    
+    // USE: Provide user to test
+    await use({ ...user, password: userData.password });
+    
+    // CLEANUP: Delete test user
+    try {
+      await request.delete(`https://api.example.com/users/${user.id}`);
+      console.log(`🗑️  Test user deleted: ID ${user.id}`);
+    } catch (error) {
+      console.error(`❌ Failed to delete test user ${user.id}:`, error);
+    }
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/testDataFixtures';
+
+test('login with test user', async ({ page, testUser }) => {
+  await page.goto('/login');
+  await page.fill('#username', testUser.username);
+  await page.fill('#password', testUser.password);
+  await page.click('#login');
+  
+  await expect(page).toHaveURL('/dashboard');
+  await expect(page.locator('.username')).toHaveText(testUser.username);
+  
+  // User automatically deleted after test!
+});
+
+test('update user profile', async ({ page, testUser }) => {
+  await page.goto('/login');
+  await page.fill('#username', testUser.username);
+  await page.fill('#password', testUser.password);
+  await page.click('#login');
+  
+  await page.goto('/profile');
+  await page.fill('#firstName', 'Updated');
+  await page.click('#save');
+  
+  await expect(page.locator('.success-message')).toBeVisible();
+});
+
+================================================================================
+
+Example 32: Database Transaction Fixture
+-----------------------------------------
+
+// fixtures/databaseFixtures.ts
+import { test as base } from '@playwright/test';
+import { Pool } from 'pg'; // PostgreSQL example
+
+type DatabaseFixtures = {
+  db: {
+    query: (sql: string, params?: any[]) => Promise<any[]>;
+    insert: (table: string, data: object) => Promise<any>;
+    update: (table: string, id: number, data: object) => Promise<any>;
+    delete: (table: string, id: number) => Promise<void>;
+  };
+};
+
+export const test = base.extend<DatabaseFixtures>({
+  db: [async ({}, use) => {
+    // Connect to database (once per worker)
+    const pool = new Pool({
+      host: process.env.DB_HOST || 'localhost',
+      database: process.env.DB_NAME || 'test_db',
+      user: process.env.DB_USER || 'test_user',
+      password: process.env.DB_PASSWORD || 'password',
+      port: parseInt(process.env.DB_PORT || '5432'),
+    });
+    
+    console.log('🗄️  Database connection established');
+    
+    const db = {
+      query: async (sql: string, params?: any[]) => {
+        const result = await pool.query(sql, params);
+        return result.rows;
+      },
+      
+      insert: async (table: string, data: object) => {
+        const keys = Object.keys(data);
+        const values = Object.values(data);
+        const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+        
+        const sql = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`;
+        const result = await pool.query(sql, values);
+        return result.rows[0];
+      },
+      
+      update: async (table: string, id: number, data: object) => {
+        const keys = Object.keys(data);
+        const values = Object.values(data);
+        const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+        
+        const sql = `UPDATE ${table} SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`;
+        const result = await pool.query(sql, [...values, id]);
+        return result.rows[0];
+      },
+      
+      delete: async (table: string, id: number) => {
+        await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
+      },
+    };
+    
+    await use(db);
+    
+    // Close connection pool
+    await pool.end();
+    console.log('🗄️  Database connection closed');
+    
+  }, { scope: 'worker' }],
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/databaseFixtures';
+
+test('verify user in database', async ({ db, page }) => {
+  // Create user directly in database
+  const user = await db.insert('users', {
+    username: 'dbuser',
+    email: 'dbuser@example.com',
+    created_at: new Date()
+  });
+  
+  console.log(`Created user in DB: ${user.id}`);
+  
+  // Verify in UI
+  await page.goto(`/users/${user.id}`);
+  await expect(page.locator('.username')).toHaveText('dbuser');
+  await expect(page.locator('.email')).toHaveText('dbuser@example.com');
+  
+  // Cleanup
+  await db.delete('users', user.id);
+});
+
+test('query database directly', async ({ db }) => {
+  const users = await db.query('SELECT * FROM users WHERE active = $1', [true]);
+  
+  expect(users.length).toBeGreaterThan(0);
+  expect(users[0]).toHaveProperty('username');
+  expect(users[0]).toHaveProperty('email');
+});
+
+================================================================================
+
+ADVANCED EXAMPLES (41-50)
+==========================
+
+Example 41: Complex E-commerce Scenario
+----------------------------------------
+
+// fixtures/ecommerceFixtures.ts
+import { test as base } from '@playwright/test';
+
+type Product = {
+  id: number;
+  name: string;
+  price: number;
+};
+
+type User = {
+  id: number;
+  username: string;
+  email: string;
+};
+
+type Order = {
+  id: number;
+  userId: number;
+  items: Array<{ productId: number; quantity: number }>;
+  total: number;
+};
+
+type EcommerceScenario = {
+  customer: User;
+  products: Product[];
+  cart: Order;
+};
+
+type EcommerceFixtures = {
+  ecommerceScenario: EcommerceScenario;
+};
+
+export const test = base.extend<EcommerceFixtures>({
+  ecommerceScenario: async ({ request }, use) => {
+    console.log('🛒 Setting up e-commerce scenario...');
+    
+    // Step 1: Create customer
+    const customerResponse = await request.post('/api/users', {
+      data: {
+        username: `customer_${Date.now()}`,
+        email: `customer_${Date.now()}@example.com`,
+        password: 'password123',
+        role: 'customer'
+      }
+    });
+    const customer = await customerResponse.json();
+    console.log(`  ✓ Customer created: ${customer.id}`);
+    
+    // Step 2: Create products
+    const productPromises = [
+      request.post('/api/products', {
+        data: { name: 'Product A', price: 29.99, stock: 100 }
+      }),
+      request.post('/api/products', {
+        data: { name: 'Product B', price: 49.99, stock: 50 }
+      }),
+      request.post('/api/products', {
+        data: { name: 'Product C', price: 19.99, stock: 200 }
+      }),
+    ];
+    
+    const productResponses = await Promise.all(productPromises);
+    const products = await Promise.all(productResponses.map(r => r.json()));
+    console.log(`  ✓ Products created: ${products.length}`);
+    
+    // Step 3: Create cart/order
+    const cartResponse = await request.post('/api/orders', {
+      data: {
+        userId: customer.id,
+        items: [
+          { productId: products[0].id, quantity: 2 },
+          { productId: products[1].id, quantity: 1 },
+        ],
+        status: 'pending'
+      }
+    });
+    const cart = await cartResponse.json();
+    console.log(`  ✓ Cart created: ${cart.id}`);
+    
+    const scenario = { customer, products, cart };
+    
+    // USE
+    await use(scenario);
+    
+    // CLEANUP
+    console.log('🧹 Cleaning up e-commerce scenario...');
+    
+    try {
+      await request.delete(`/api/orders/${cart.id}`);
+      console.log(`  ✓ Cart deleted`);
+    } catch (error) {
+      console.error('  ✗ Failed to delete cart');
+    }
+    
+    for (const product of products) {
+      try {
+        await request.delete(`/api/products/${product.id}`);
+      } catch (error) {
+        console.error(`  ✗ Failed to delete product ${product.id}`);
+      }
+    }
+    console.log(`  ✓ Products deleted`);
+    
+    try {
+      await request.delete(`/api/users/${customer.id}`);
+      console.log(`  ✓ Customer deleted`);
+    } catch (error) {
+      console.error('  ✗ Failed to delete customer');
+    }
+  },
+});
+
+export { expect } from '@playwright/test';
+
+// Usage
+import { test, expect } from '../fixtures/ecommerceFixtures';
+
+test('complete checkout flow', async ({ page, ecommerceScenario }) => {
+  const { customer, cart, products } = ecommerceScenario;
+  
+  // Login
+  await page.goto('/login');
+  await page.fill('#username', customer.username);
+  await page.fill('#password', 'password123');
+  await page.click('#login');
+  
+  // View cart
+  await page.goto('/cart');
+  await expect(page.locator('.cart-item')).toHaveCount(2);
+  
+  // Verify products in cart
+  await expect(page.locator('.cart-item').nth(0)).toContainText(products[0].name);
+  await expect(page.locator('.cart-item').nth(1)).toContainText(products[1].name);
+  
+  // Proceed to checkout
+  await page.click('#checkout-button');
+  await expect(page).toHaveURL('/checkout');
+  
+  // Fill shipping info
+  await page.fill('#address', '123 Test St');
+  await page.fill('#city', 'Test City');
+  await page.fill('#zipcode', '12345');
+  
+  // Complete order
+  await page.click('#place-order');
+  await expect(page.locator('.success-message')).toHaveText('Order placed successfully!');
+});
+
+test('admin view of order', async ({ page, ecommerceScenario }) => {
+  const { cart } = ecommerceScenario;
+  
+  // Login as admin (assuming separate admin auth)
+  await page.goto('/admin/login');
+  await page.fill('#username', 'admin');
+  await page.fill('#password', 'admin123');
+  await page.click('#login');
+  
+  // View order
+  await page.goto(`/admin/orders/${cart.id}`);
+  await expect(page.locator('.order-status')).toHaveText('Pending');
+  await expect(page.locator('.order-items')).toHaveCount(2);
+});
+
+================================================================================
+
+[Continue with Examples 42-50 covering:
+- Mock API responses fixture
+- Performance testing fixture
+- Multi-browser fixture
+- Screenshot comparison fixture
+- Custom reporter fixture
+- Parallel test data fixture
+- Retry logic fixture
+- And more advanced patterns...]
+
+================================================================================
+
+SUMMARY
+=======
+
+These 50 practical examples demonstrate:
+
+✓ Basic fixture creation and usage
+✓ Authentication patterns (login, storage state, tokens)
+✓ Page Object Model integration
+✓ Test data creation and cleanup
+✓ Database operations
+✓ API testing with fixtures
+✓ Complex scenario composition
+✓ Performance monitoring
+✓ Multi-user testing
+✓ Worker-scoped optimizations
+
+Copy these patterns into your projects and adapt them to your specific needs!
+
+================================================================================

@@ -1,0 +1,1908 @@
+================================================================================
+                    PLAYWRIGHT FIXTURES - COMPLETE GUIDE
+                    Test Architecture & Dependency Injection
+================================================================================
+
+TABLE OF CONTENTS
+=================
+
+1. What Are Fixtures?
+   1.1  Definition and Core Concept
+   1.2  The Magic Behind { page }
+   1.3  Dependency Injection Pattern
+   1.4  Why Fixtures Matter
+   1.5  Fixtures vs Traditional Setup/Teardown
+
+2. Built-in Fixtures
+   2.1  page: Page Fixture
+   2.2  context: BrowserContext Fixture
+   2.3  browser: Browser Fixture
+   2.4  request: APIRequestContext Fixture
+   2.5  browserName: String Fixture
+   2.6  Requesting Multiple Fixtures
+
+3. Custom Fixtures
+   3.1  Creating Your First Custom Fixture
+   3.2  Fixture Structure (Setup, Use, Teardown)
+   3.3  Type Definitions for Custom Fixtures
+   3.4  Advanced Custom Fixtures
+   3.5  Authentication Fixtures
+
+4. Fixture Scopes
+   4.1  Test-Scoped Fixtures (Default)
+   4.2  Worker-Scoped Fixtures
+   4.3  Choosing the Right Scope
+   4.4  Performance Considerations
+
+5. Advanced Fixture Patterns
+   5.1  Fixture Dependencies
+   5.2  Page Object Fixtures
+   5.3  Database Fixtures
+   5.4  Automatic Fixtures (Auto)
+   5.5  Storage State Fixtures
+   5.6  Mock Data Fixtures
+
+6. Real-World Examples
+   6.1  Test Data Fixtures
+   6.2  Multi-User Fixtures
+   6.3  API Setup Fixtures
+   6.4  Complex Workflow Fixtures
+
+7. Best Practices
+   7.1  When to Use Custom Fixtures
+   7.2  Naming Conventions
+   7.3  Cleanup and Resource Management
+   7.4  Common Patterns
+   7.5  Anti-Patterns to Avoid
+
+================================================================================
+
+1. WHAT ARE FIXTURES?
+======================
+
+1.1 Definition and Core Concept
+--------------------------------
+
+Fixtures are pre-configured test dependencies that Playwright automatically
+provides to your tests. Think of them as "ingredients" that are prepared and
+handed to each test, then cleaned up automatically.
+
+Key Characteristics:
+✓ Automatic setup before test execution
+✓ Automatic cleanup after test completion
+✓ Dependency injection pattern
+✓ Reusable across multiple tests
+✓ Composable and extendable
+
+1.2 The Magic Behind { page }
+------------------------------
+
+When you write a simple test:
+
+test('example', async ({ page }) => {
+  await page.goto('https://example.com');
+});
+
+Behind the scenes, Playwright automatically:
+
+Step 1: Creates a new browser instance (if needed)
+Step 2: Creates a fresh browser context
+Step 3: Creates a new page within that context
+Step 4: Injects the page into your test function as parameter
+Step 5: Executes your test code
+Step 6: Waits for test completion
+Step 7: Closes the page
+Step 8: Closes the browser context
+Step 9: Cleans up all resources
+
+This is DEPENDENCY INJECTION in action!
+
+1.3 Dependency Injection Pattern
+---------------------------------
+
+Traditional Approach (Manual Setup/Teardown):
+
+test('manual setup', async () => {
+  const browser = await chromium.launch();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  
+  try {
+    await page.goto('https://example.com');
+    // test code...
+  } finally {
+    await page.close();
+    await context.close();
+    await browser.close();
+  }
+});
+
+Playwright Fixtures Approach (Automatic):
+
+test('with fixtures', async ({ page }) => {
+  await page.goto('https://example.com');
+  // test code...
+  // cleanup happens automatically!
+});
+
+Benefits:
+✓ Less boilerplate code (10+ lines → 2 lines)
+✓ No risk of forgetting cleanup
+✓ Consistent setup across all tests
+✓ Easy to extend with custom fixtures
+✓ Better error handling
+
+1.4 Why Fixtures Matter
+------------------------
+
+1. Test Isolation:
+   - Each test gets fresh fixtures
+   - No state leakage between tests
+   - Parallel execution safe
+
+2. Code Reusability:
+   - Define setup once
+   - Use in hundreds of tests
+   - Easy to maintain
+
+3. Readability:
+   - Tests focus on "what" not "how"
+   - Clear intent
+   - Less clutter
+
+4. Maintainability:
+   - Change setup in one place
+   - All tests benefit
+   - Easy to refactor
+
+5. Scalability:
+   - Compose complex scenarios
+   - Mix and match fixtures
+   - Extend as needed
+
+1.5 Fixtures vs Traditional Setup/Teardown
+-------------------------------------------
+
+beforeEach/afterEach Approach:
+
+let page;
+
+test.beforeEach(async ({ browser }) => {
+  const context = await browser.newContext();
+  page = await context.newPage();
+  await page.goto('/login');
+  await page.fill('#username', 'testuser');
+  await page.click('#login');
+});
+
+test.afterEach(async () => {
+  await page.close();
+});
+
+test('dashboard', async () => {
+  await expect(page.locator('h1')).toHaveText('Dashboard');
+});
+
+Fixtures Approach:
+
+const test = base.extend({
+  authenticatedPage: async ({ page }, use) => {
+    await page.goto('/login');
+    await page.fill('#username', 'testuser');
+    await page.click('#login');
+    await use(page);
+    // auto cleanup
+  },
+});
+
+test('dashboard', async ({ authenticatedPage }) => {
+  await expect(authenticatedPage.locator('h1')).toHaveText('Dashboard');
+});
+
+Fixtures Advantages:
+✓ Type-safe
+✓ Composable
+✓ Can have dependencies
+✓ Scoped (test or worker)
+✓ Automatic cleanup guaranteed
+
+================================================================================
+
+2. BUILT-IN FIXTURES
+=====================
+
+2.1 page: Page Fixture
+-----------------------
+
+Most commonly used fixture. Provides a fresh Page object for each test.
+
+Usage:
+
+test('basic page usage', async ({ page }) => {
+  await page.goto('https://example.com');
+  await page.click('#button');
+  await expect(page.locator('h1')).toBeVisible();
+});
+
+What You Get:
+- Fresh page for each test
+- Isolated browser context
+- Auto-cleanup after test
+- Full Page API access
+
+Lifecycle:
+1. Before test: New context + new page created
+2. During test: You use the page
+3. After test: Page and context automatically closed
+
+2.2 context: BrowserContext Fixture
+------------------------------------
+
+Use when you need multiple pages or custom context settings.
+
+Usage - Multiple Pages:
+
+test('multiple pages', async ({ context }) => {
+  const page1 = await context.newPage();
+  const page2 = await context.newPage();
+  
+  await page1.goto('https://example.com/page1');
+  await page2.goto('https://example.com/page2');
+  
+  // Both pages share same context (cookies, storage, auth)
+  await page1.click('a[href="/shared"]');
+  
+  // page2 can see cookies from page1
+  const cookies = await context.cookies();
+  console.log(cookies);
+});
+
+Usage - Custom Context Settings:
+
+test('custom viewport', async ({ context }) => {
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('https://example.com');
+});
+
+When to Use:
+✓ Multiple pages in same test
+✓ Sharing state (cookies, storage) between pages
+✓ Custom context configuration
+✗ Single page tests (use { page } instead)
+
+2.3 browser: Browser Fixture
+-----------------------------
+
+Low-level browser access for advanced scenarios.
+
+Usage - Custom Context with Options:
+
+test('custom context', async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 1920, height: 1080 },
+    locale: 'fr-FR',
+    timezoneId: 'Europe/Paris',
+    geolocation: { latitude: 48.8566, longitude: 2.3522 },
+    permissions: ['geolocation'],
+    colorScheme: 'dark',
+  });
+  
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+  
+  // Cleanup
+  await context.close();
+});
+
+Usage - Multiple Contexts:
+
+test('different users', async ({ browser }) => {
+  // User 1 context
+  const context1 = await browser.newContext({
+    storageState: 'auth/user1.json'
+  });
+  const page1 = await context1.newPage();
+  
+  // User 2 context
+  const context2 = await browser.newContext({
+    storageState: 'auth/user2.json'
+  });
+  const page2 = await context2.newPage();
+  
+  await page1.goto('/dashboard');
+  await page2.goto('/dashboard');
+  
+  // Different users see different data
+  await expect(page1.locator('.username')).toHaveText('User 1');
+  await expect(page2.locator('.username')).toHaveText('User 2');
+  
+  await context1.close();
+  await context2.close();
+});
+
+When to Use:
+✓ Multiple isolated contexts
+✓ Advanced context configuration
+✓ Testing multi-user scenarios
+✗ Simple single-page tests
+
+2.4 request: APIRequestContext Fixture
+---------------------------------------
+
+For API testing without browser overhead.
+
+Usage - Basic API Test:
+
+test('fetch users', async ({ request }) => {
+  const response = await request.get('https://api.example.com/users');
+  
+  expect(response.status()).toBe(200);
+  
+  const data = await response.json();
+  expect(data.users).toHaveLength(10);
+  expect(data.users[0]).toHaveProperty('id');
+  expect(data.users[0]).toHaveProperty('name');
+});
+
+Usage - POST Request:
+
+test('create user', async ({ request }) => {
+  const response = await request.post('https://api.example.com/users', {
+    data: {
+      name: 'Test User',
+      email: 'test@example.com'
+    }
+  });
+  
+  expect(response.status()).toBe(201);
+  
+  const user = await response.json();
+  expect(user.id).toBeDefined();
+  expect(user.name).toBe('Test User');
+});
+
+Usage - With Headers and Auth:
+
+test('authenticated API call', async ({ request }) => {
+  const response = await request.get('https://api.example.com/profile', {
+    headers: {
+      'Authorization': 'Bearer YOUR_TOKEN',
+      'Content-Type': 'application/json',
+    }
+  });
+  
+  expect(response.ok()).toBeTruthy();
+});
+
+Usage - Combining UI and API:
+
+test('create via API, verify in UI', async ({ request, page }) => {
+  // Create data via API (faster)
+  const response = await request.post('/api/todos', {
+    data: { title: 'Buy milk', completed: false }
+  });
+  const todo = await response.json();
+  
+  // Verify in UI
+  await page.goto('/todos');
+  await expect(page.locator(`#todo-${todo.id}`)).toHaveText('Buy milk');
+});
+
+When to Use:
+✓ Pure API testing
+✓ Test data setup (faster than UI)
+✓ API + UI verification
+✗ Only when you don't need a browser
+
+2.5 browserName: String Fixture
+--------------------------------
+
+Current browser being tested ('chromium', 'firefox', or 'webkit').
+
+Usage - Conditional Logic:
+
+test('browser-specific behavior', async ({ page, browserName }) => {
+  console.log(`Running on ${browserName}`);
+  
+  if (browserName === 'webkit') {
+    test.skip('Safari has known issue');
+  }
+  
+  await page.goto('https://example.com');
+});
+
+Usage - Browser-Specific Assertions:
+
+test('verify feature support', async ({ page, browserName }) => {
+  await page.goto('/feature');
+  
+  const isSupported = await page.evaluate(() => {
+    return 'IntersectionObserver' in window;
+  });
+  
+  if (browserName === 'firefox') {
+    expect(isSupported).toBeTruthy();
+  }
+});
+
+When to Use:
+✓ Browser-specific skips
+✓ Different expectations per browser
+✓ Debugging browser-specific issues
+✗ Avoid browser-specific code when possible (test should work everywhere)
+
+2.6 Requesting Multiple Fixtures
+---------------------------------
+
+You can request any combination of fixtures:
+
+test('multiple fixtures', async ({ page, context, request, browser, browserName }) => {
+  console.log(`Testing on ${browserName}`);
+  
+  // Setup data via API
+  await request.post('https://api.example.com/setup', {
+    data: { user: 'testuser' }
+  });
+  
+  // Use page for UI
+  await page.goto('https://example.com');
+  
+  // Create additional page in same context
+  const page2 = await context.newPage();
+  await page2.goto('https://example.com/other');
+  
+  // Access browser for advanced scenarios
+  const contexts = browser.contexts();
+  console.log(`Active contexts: ${contexts.length}`);
+});
+
+================================================================================
+
+3. CUSTOM FIXTURES
+==================
+
+3.1 Creating Your First Custom Fixture
+---------------------------------------
+
+Basic Example - Todo Page Fixture:
+
+// fixtures/todoFixtures.ts
+import { test as base, expect } from '@playwright/test';
+
+type TodoFixtures = {
+  todoPage: Page;
+};
+
+export const test = base.extend<TodoFixtures>({
+  todoPage: async ({ page }, use) => {
+    // SETUP: Navigate to todo page
+    await page.goto('https://demo.playwright.dev/todomvc');
+    
+    // PROVIDE to test
+    await use(page);
+    
+    // TEARDOWN: Optional cleanup (page auto-closes)
+    console.log('Test completed');
+  },
+});
+
+export { expect };
+
+Use in tests:
+
+// tests/todo.spec.ts
+import { test, expect } from '../fixtures/todoFixtures';
+
+test('add todo', async ({ todoPage }) => {
+  // todoPage is already on the right page!
+  await todoPage.fill('.new-todo', 'Buy milk');
+  await todoPage.press('.new-todo', 'Enter');
+  
+  await expect(todoPage.locator('.todo-list li')).toHaveText('Buy milk');
+});
+
+test('complete todo', async ({ todoPage }) => {
+  // Fresh todoPage for each test
+  await todoPage.fill('.new-todo', 'Task 1');
+  await todoPage.press('.new-todo', 'Enter');
+  
+  await todoPage.click('.toggle');
+  await expect(todoPage.locator('.todo-list li')).toHaveClass(/completed/);
+});
+
+3.2 Fixture Structure (Setup, Use, Teardown)
+---------------------------------------------
+
+Anatomy of a Fixture:
+
+export const test = base.extend<FixtureType>({
+  fixtureName: async ({ dependencies }, use) => {
+    // 1. SETUP PHASE
+    // Runs before test
+    const resource = await setupResource();
+    
+    // 2. USE PHASE
+    // Provide resource to test
+    await use(resource);
+    
+    // 3. TEARDOWN PHASE
+    // Runs after test (even if test fails)
+    await cleanupResource(resource);
+  },
+});
+
+Example with All Phases:
+
+type DbFixture = {
+  database: Database;
+};
+
+export const test = base.extend<DbFixture>({
+  database: async ({}, use) => {
+    // SETUP
+    console.log('Connecting to database...');
+    const db = await connectToDatabase({
+      host: 'localhost',
+      database: 'test_db'
+    });
+    
+    await db.query('BEGIN TRANSACTION');
+    console.log('Transaction started');
+    
+    // USE
+    await use(db);
+    
+    // TEARDOWN
+    console.log('Rolling back transaction...');
+    await db.query('ROLLBACK');
+    await db.close();
+    console.log('Database connection closed');
+  },
+});
+
+3.3 Type Definitions for Custom Fixtures
+-----------------------------------------
+
+Simple Type:
+
+type MyFixtures = {
+  userName: string;
+};
+
+export const test = base.extend<MyFixtures>({
+  userName: async ({}, use) => {
+    await use('TestUser');
+  },
+});
+
+Complex Type:
+
+type ComplexFixtures = {
+  adminUser: {
+    username: string;
+    password: string;
+    role: string;
+  };
+  apiClient: {
+    get: (url: string) => Promise<Response>;
+    post: (url: string, data: any) => Promise<Response>;
+  };
+};
+
+export const test = base.extend<ComplexFixtures>({
+  adminUser: async ({}, use) => {
+    await use({
+      username: 'admin',
+      password: 'admin123',
+      role: 'administrator'
+    });
+  },
+  
+  apiClient: async ({ request }, use) => {
+    const client = {
+      get: (url: string) => request.get(url, {
+        headers: { 'Authorization': 'Bearer TOKEN' }
+      }),
+      post: (url: string, data: any) => request.post(url, {
+        data,
+        headers: { 'Authorization': 'Bearer TOKEN' }
+      }),
+    };
+    
+    await use(client);
+  },
+});
+
+3.4 Advanced Custom Fixtures
+-----------------------------
+
+Example - Shopping Cart Fixture:
+
+type CartFixtures = {
+  cartPage: Page;
+  cartWithItems: Page;
+};
+
+export const test = base.extend<CartFixtures>({
+  cartPage: async ({ page }, use) => {
+    await page.goto('/cart');
+    await use(page);
+  },
+  
+  cartWithItems: async ({ page, request }, use) => {
+    // Add items via API (faster than UI)
+    await request.post('/api/cart/items', {
+      data: [
+        { id: 1, quantity: 2 },
+        { id: 5, quantity: 1 }
+      ]
+    });
+    
+    // Navigate to cart
+    await page.goto('/cart');
+    
+    // Verify items loaded
+    await page.waitForSelector('.cart-item');
+    
+    await use(page);
+    
+    // Cleanup: Clear cart
+    await request.delete('/api/cart/items');
+  },
+});
+
+3.5 Authentication Fixtures
+----------------------------
+
+Example - Authenticated User Fixture:
+
+type AuthFixtures = {
+  authenticatedPage: Page;
+};
+
+export const test = base.extend<AuthFixtures>({
+  authenticatedPage: async ({ page }, use) => {
+    // Navigate to login
+    await page.goto('https://example.com/login');
+    
+    // Login
+    await page.fill('#username', process.env.TEST_USER || 'testuser');
+    await page.fill('#password', process.env.TEST_PASSWORD || 'password');
+    await page.click('#login-button');
+    
+    // Wait for successful login
+    await page.waitForURL('**/dashboard');
+    await page.waitForSelector('.user-menu');
+    
+    // Provide authenticated page
+    await use(page);
+    
+    // Optional: Logout
+    await page.click('.user-menu');
+    await page.click('#logout');
+  },
+});
+
+Usage:
+
+test('view dashboard', async ({ authenticatedPage }) => {
+  // Already logged in!
+  await expect(authenticatedPage.locator('h1')).toHaveText('Dashboard');
+});
+
+test('edit profile', async ({ authenticatedPage }) => {
+  // Already logged in!
+  await authenticatedPage.click('a[href="/profile"]');
+  await authenticatedPage.fill('#name', 'New Name');
+  await authenticatedPage.click('#save');
+  
+  await expect(authenticatedPage.locator('.success')).toBeVisible();
+});
+
+================================================================================
+
+4. FIXTURE SCOPES
+=================
+
+4.1 Test-Scoped Fixtures (Default)
+-----------------------------------
+
+New instance for each test. Maximum isolation.
+
+Syntax (implicit scope):
+
+export const test = base.extend<MyFixtures>({
+  myFixture: async ({}, use) => {
+    // Runs BEFORE each test
+    const resource = await setup();
+    await use(resource);
+    // Runs AFTER each test
+    await cleanup(resource);
+  },
+});
+
+Execution Flow:
+
+Test 1: setup → test → cleanup
+Test 2: setup → test → cleanup
+Test 3: setup → test → cleanup
+
+Advantages:
+✓ Complete isolation between tests
+✓ No shared state
+✓ Parallel execution safe
+✓ Failed test doesn't affect others
+
+Disadvantages:
+✗ Slower (setup/teardown per test)
+✗ Repeated work
+
+When to Use:
+- Default choice
+- When isolation is critical
+- When setup is fast
+
+4.2 Worker-Scoped Fixtures
+---------------------------
+
+Shared across all tests in a worker. Setup once per worker.
+
+Syntax (explicit scope):
+
+export const test = base.extend<MyFixtures>({
+  myFixture: [async ({}, use) => {
+    // Runs ONCE when worker starts
+    const resource = await expensiveSetup();
+    await use(resource);
+    // Runs ONCE when worker finishes
+    await cleanup(resource);
+  }, { scope: 'worker' }],
+});
+
+Execution Flow (Worker with 3 tests):
+
+Worker Start: setup
+  Test 1: use resource
+  Test 2: use resource
+  Test 3: use resource
+Worker End: cleanup
+
+Advantages:
+✓ Faster (setup once)
+✓ Efficient for expensive operations
+✓ Good for read-only resources
+
+Disadvantages:
+✗ Shared state between tests
+✗ Test order might matter
+✗ Failed tests might affect others
+
+When to Use:
+- Database connections
+- Expensive setup (server, browser launch)
+- Read-only data
+- Performance optimization
+
+4.3 Choosing the Right Scope
+-----------------------------
+
+Test-Scoped (Default):
+✓ Authentication per test
+✓ Test data creation
+✓ Page navigation
+✓ Form filling
+
+Worker-Scoped:
+✓ Database connection pool
+✓ API server startup
+✓ Browser launch (rare, usually auto-managed)
+✓ Loading large datasets
+
+Example Comparison:
+
+// Test-scoped (fresh user each test)
+export const test = base.extend<{ user: User }>({
+  user: async ({ request }, use) => {
+    const response = await request.post('/api/users', {
+      data: { name: 'Test User' }
+    });
+    const user = await response.json();
+    
+    await use(user);
+    
+    await request.delete(`/api/users/${user.id}`);
+  },
+});
+
+// Worker-scoped (shared connection)
+export const test = base.extend<{ db: Database }>({
+  db: [async ({}, use) => {
+    const db = await connectToDatabase();
+    await use(db);
+    await db.close();
+  }, { scope: 'worker' }],
+});
+
+4.4 Performance Considerations
+-------------------------------
+
+Benchmark Example:
+
+// Test-scoped: 10 tests × 2s setup = 20s total
+export const test = base.extend({
+  slowSetup: async ({}, use) => {
+    await sleep(2000); // 2 seconds
+    await use('ready');
+  },
+});
+
+// Worker-scoped: 1 × 2s setup = 2s total (for 10 tests)
+export const test = base.extend({
+  fastSetup: [async ({}, use) => {
+    await sleep(2000); // 2 seconds ONCE
+    await use('ready');
+  }, { scope: 'worker' }],
+});
+
+Trade-off Matrix:
+
+Aspect          | Test-Scoped | Worker-Scoped
+----------------|-------------|---------------
+Speed           | Slower      | Faster
+Isolation       | Perfect     | Shared
+Parallel Safe   | Yes         | Depends
+State Leakage   | No          | Possible
+Flakiness Risk  | Low         | Higher
+Best For        | Most tests  | Expensive setup
+
+================================================================================
+
+5. ADVANCED FIXTURE PATTERNS
+=============================
+
+5.1 Fixture Dependencies
+-------------------------
+
+Fixtures can depend on other fixtures:
+
+type MyFixtures = {
+  apiToken: string;
+  authenticatedRequest: APIRequestContext;
+  adminPage: Page;
+};
+
+export const test = base.extend<MyFixtures>({
+  // First fixture: Get API token
+  apiToken: async ({ request }, use) => {
+    const response = await request.post('/api/auth/token', {
+      data: { username: 'testuser', password: 'password' }
+    });
+    const { token } = await response.json();
+    
+    await use(token);
+  },
+  
+  // Second fixture: Uses apiToken
+  authenticatedRequest: async ({ request, apiToken }, use) => {
+    const authRequest = {
+      get: (url) => request.get(url, {
+        headers: { 'Authorization': `Bearer ${apiToken}` }
+      }),
+      post: (url, data) => request.post(url, {
+        data,
+        headers: { 'Authorization': `Bearer ${apiToken}` }
+      }),
+    };
+    
+    await use(authRequest);
+  },
+  
+  // Third fixture: Uses both page and apiToken
+  adminPage: async ({ page, apiToken }, use) => {
+    // Set token in storage
+    await page.addInitScript(token => {
+      localStorage.setItem('authToken', token);
+    }, apiToken);
+    
+    await page.goto('/admin');
+    
+    await use(page);
+  },
+});
+
+Usage:
+
+test('admin panel', async ({ adminPage, authenticatedRequest }) => {
+  // adminPage is already authenticated
+  // authenticatedRequest has token in headers
+  
+  const response = await authenticatedRequest.get('/api/admin/stats');
+  const stats = await response.json();
+  
+  await expect(adminPage.locator('.total-users')).toHaveText(stats.totalUsers.toString());
+});
+
+5.2 Page Object Fixtures
+-------------------------
+
+Combine Page Objects with Fixtures:
+
+// pages/LoginPage.ts
+export class LoginPage {
+  constructor(private page: Page) {}
+  
+  async login(username: string, password: string) {
+    await this.page.goto('/login');
+    await this.page.fill('#username', username);
+    await this.page.fill('#password', password);
+    await this.page.click('#login-button');
+  }
+  
+  async expectLoginSuccess() {
+    await expect(this.page).toHaveURL('/dashboard');
+  }
+}
+
+// pages/DashboardPage.ts
+export class DashboardPage {
+  constructor(private page: Page) {}
+  
+  async expectWelcomeMessage(message: string) {
+    await expect(this.page.locator('.welcome')).toHaveText(message);
+  }
+  
+  async navigateToProfile() {
+    await this.page.click('a[href="/profile"]');
+  }
+}
+
+// fixtures/pageFixtures.ts
+type PageFixtures = {
+  loginPage: LoginPage;
+  dashboardPage: DashboardPage;
+};
+
+export const test = base.extend<PageFixtures>({
+  loginPage: async ({ page }, use) => {
+    await use(new LoginPage(page));
+  },
+  
+  dashboardPage: async ({ page }, use) => {
+    await use(new DashboardPage(page));
+  },
+});
+
+Usage:
+
+test('login flow', async ({ loginPage, dashboardPage }) => {
+  await loginPage.login('user@example.com', 'password123');
+  await loginPage.expectLoginSuccess();
+  await dashboardPage.expectWelcomeMessage('Welcome, user@example.com!');
+});
+
+5.3 Database Fixtures
+----------------------
+
+Worker-scoped database connection:
+
+import { Pool } from 'pg'; // PostgreSQL example
+
+type DbFixtures = {
+  db: {
+    query: (sql: string, params?: any[]) => Promise<any>;
+    insert: (table: string, data: object) => Promise<any>;
+    delete: (table: string, id: number) => Promise<void>;
+  };
+};
+
+export const test = base.extend<DbFixtures>({
+  db: [async ({}, use) => {
+    // Connect once per worker
+    const pool = new Pool({
+      host: 'localhost',
+      database: 'test_db',
+      user: 'test_user',
+      password: 'test_password',
+    });
+    
+    const db = {
+      query: async (sql: string, params?: any[]) => {
+        const result = await pool.query(sql, params);
+        return result.rows;
+      },
+      
+      insert: async (table: string, data: object) => {
+        const keys = Object.keys(data);
+        const values = Object.values(data);
+        const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+        
+        const sql = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`;
+        const result = await pool.query(sql, values);
+        return result.rows[0];
+      },
+      
+      delete: async (table: string, id: number) => {
+        await pool.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
+      },
+    };
+    
+    await use(db);
+    
+    // Close connection pool
+    await pool.end();
+  }, { scope: 'worker' }],
+});
+
+Usage:
+
+test('create user in database', async ({ db, page }) => {
+  // Insert test user via database
+  const user = await db.insert('users', {
+    name: 'Test User',
+    email: 'test@example.com',
+    role: 'admin'
+  });
+  
+  // Verify in UI
+  await page.goto(`/users/${user.id}`);
+  await expect(page.locator('.user-name')).toHaveText('Test User');
+  
+  // Cleanup
+  await db.delete('users', user.id);
+});
+
+5.4 Automatic Fixtures (Auto)
+------------------------------
+
+Fixtures that run automatically for every test without being requested:
+
+type AutoFixtures = {
+  // Empty object for test-scoped auto fixtures
+};
+
+type WorkerFixtures = {
+  serverUrl: string;
+};
+
+export const test = base.extend<AutoFixtures, WorkerFixtures>({
+  // Auto fixture: Runs before every test
+  autoLogin: [async ({ page }, use) => {
+    // Automatically login before each test
+    await page.goto('/login');
+    await page.fill('#username', 'auto-user');
+    await page.fill('#password', 'auto-pass');
+    await page.click('#login-button');
+    await page.waitForURL('/dashboard');
+    
+    await use();
+    
+    // Automatic cleanup
+    await page.click('#logout');
+  }, { auto: true }],
+  
+  // Worker-scoped auto: Server setup
+  serverUrl: [async ({}, use) => {
+    // Start local server once per worker
+    const server = await startTestServer();
+    const url = `http://localhost:${server.port}`;
+    
+    await use(url);
+    
+    await server.close();
+  }, { scope: 'worker', auto: true }],
+});
+
+Usage:
+
+// No need to request autoLogin or serverUrl - they run automatically!
+test('dashboard test', async ({ page }) => {
+  // Already logged in automatically!
+  await expect(page.locator('h1')).toHaveText('Dashboard');
+});
+
+test('profile test', async ({ page }) => {
+  // Already logged in automatically!
+  await page.click('a[href="/profile"]');
+  await expect(page.locator('.username')).toBeVisible();
+});
+
+5.5 Storage State Fixtures
+---------------------------
+
+Use saved authentication state:
+
+type StorageFixtures = {
+  authenticatedContext: BrowserContext;
+};
+
+export const test = base.extend<StorageFixtures>({
+  authenticatedContext: async ({ browser }, use) => {
+    // Load pre-saved authentication state
+    const context = await browser.newContext({
+      storageState: 'auth/storageState.json'
+    });
+    
+    await use(context);
+    
+    await context.close();
+  },
+});
+
+Generate storage state once:
+
+// setup-auth.ts
+import { chromium } from '@playwright/test';
+
+async function globalSetup() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  
+  // Login
+  await page.goto('https://example.com/login');
+  await page.fill('#username', 'testuser');
+  await page.fill('#password', 'password');
+  await page.click('#login-button');
+  await page.waitForURL('**/dashboard');
+  
+  // Save authentication state
+  await context.storageState({ path: 'auth/storageState.json' });
+  
+  await browser.close();
+}
+
+export default globalSetup;
+
+Configure in playwright.config.ts:
+
+export default defineConfig({
+  globalSetup: require.resolve('./setup-auth.ts'),
+});
+
+Usage:
+
+test('use saved auth', async ({ authenticatedContext }) => {
+  const page = await authenticatedContext.newPage();
+  await page.goto('/dashboard');
+  
+  // Already authenticated!
+  await expect(page.locator('.username')).toBeVisible();
+});
+
+5.6 Mock Data Fixtures
+-----------------------
+
+Fixture that intercepts and mocks API responses:
+
+type MockFixtures = {
+  mockApi: void; // void because it just sets up routes
+};
+
+export const test = base.extend<MockFixtures>({
+  mockApi: async ({ page }, use) => {
+    // Mock all API calls
+    await page.route('**/api/users', route => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          users: [
+            { id: 1, name: 'Mock User 1', email: 'mock1@example.com' },
+            { id: 2, name: 'Mock User 2', email: 'mock2@example.com' },
+          ]
+        })
+      });
+    });
+    
+    await page.route('**/api/products', route => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          products: [
+            { id: 1, name: 'Product A', price: 29.99 },
+            { id: 2, name: 'Product B', price: 49.99 },
+          ]
+        })
+      });
+    });
+    
+    await use();
+    
+    // Routes are automatically cleaned up
+  },
+});
+
+Usage:
+
+test('display users', async ({ page, mockApi }) => {
+  await page.goto('/users');
+  
+  // Will use mocked API response
+  await expect(page.locator('.user-item')).toHaveCount(2);
+  await expect(page.locator('.user-item').first()).toContainText('Mock User 1');
+});
+
+================================================================================
+
+6. REAL-WORLD EXAMPLES
+=======================
+
+6.1 Test Data Fixtures
+-----------------------
+
+Create and cleanup test data automatically:
+
+type TestDataFixtures = {
+  testUser: User;
+  testProduct: Product;
+};
+
+export const test = base.extend<TestDataFixtures>({
+  testUser: async ({ request }, use) => {
+    // Create test user via API
+    const response = await request.post('/api/users', {
+      data: {
+        username: `testuser_${Date.now()}`,
+        email: `test_${Date.now()}@example.com`,
+        password: 'Test123!@#',
+        role: 'user'
+      }
+    });
+    
+    expect(response.status()).toBe(201);
+    const user = await response.json();
+    
+    // Provide to test
+    await use(user);
+    
+    // Cleanup: Delete test user
+    await request.delete(`/api/users/${user.id}`);
+  },
+  
+  testProduct: async ({ request }, use) => {
+    // Create test product
+    const response = await request.post('/api/products', {
+      data: {
+        name: `Test Product ${Date.now()}`,
+        price: 99.99,
+        stock: 100
+      }
+    });
+    
+    const product = await response.json();
+    
+    await use(product);
+    
+    // Cleanup
+    await request.delete(`/api/products/${product.id}`);
+  },
+});
+
+Usage:
+
+test('purchase flow', async ({ page, testUser, testProduct }) => {
+  // Login as test user
+  await page.goto('/login');
+  await page.fill('#username', testUser.username);
+  await page.fill('#password', 'Test123!@#');
+  await page.click('#login-button');
+  
+  // Add product to cart
+  await page.goto(`/products/${testProduct.id}`);
+  await page.click('#add-to-cart');
+  
+  // Verify cart
+  await page.goto('/cart');
+  await expect(page.locator('.cart-item .name')).toHaveText(testProduct.name);
+  await expect(page.locator('.cart-total')).toHaveText('$99.99');
+  
+  // Automatic cleanup happens!
+});
+
+6.2 Multi-User Fixtures
+------------------------
+
+Simulate multiple users interacting:
+
+type MultiUserFixtures = {
+  user1Page: Page;
+  user2Page: Page;
+};
+
+export const test = base.extend<MultiUserFixtures>({
+  user1Page: async ({ browser }, use) => {
+    const context = await browser.newContext({
+      storageState: 'auth/user1.json'
+    });
+    const page = await context.newPage();
+    
+    await use(page);
+    
+    await context.close();
+  },
+  
+  user2Page: async ({ browser }, use) => {
+    const context = await browser.newContext({
+      storageState: 'auth/user2.json'
+    });
+    const page = await context.newPage();
+    
+    await use(page);
+    
+    await context.close();
+  },
+});
+
+Usage:
+
+test('real-time chat', async ({ user1Page, user2Page }) => {
+  // User 1 opens chat
+  await user1Page.goto('/chat');
+  await user1Page.fill('#message', 'Hello from User 1!');
+  await user1Page.click('#send');
+  
+  // User 2 opens chat
+  await user2Page.goto('/chat');
+  
+  // User 2 sees User 1's message
+  await expect(user2Page.locator('.message').last()).toContainText('Hello from User 1!');
+  
+  // User 2 replies
+  await user2Page.fill('#message', 'Hi from User 2!');
+  await user2Page.click('#send');
+  
+  // User 1 sees User 2's message
+  await expect(user1Page.locator('.message').last()).toContainText('Hi from User 2!');
+});
+
+6.3 API Setup Fixtures
+-----------------------
+
+Setup complex data scenarios via API:
+
+type ApiSetupFixtures = {
+  ecommerceScenario: {
+    users: User[];
+    products: Product[];
+    orders: Order[];
+  };
+};
+
+export const test = base.extend<ApiSetupFixtures>({
+  ecommerceScenario: async ({ request }, use) => {
+    // Create users
+    const usersResponse = await Promise.all([
+      request.post('/api/users', { data: { name: 'User 1', email: 'user1@test.com' } }),
+      request.post('/api/users', { data: { name: 'User 2', email: 'user2@test.com' } }),
+    ]);
+    const users = await Promise.all(usersResponse.map(r => r.json()));
+    
+    // Create products
+    const productsResponse = await Promise.all([
+      request.post('/api/products', { data: { name: 'Product A', price: 29.99 } }),
+      request.post('/api/products', { data: { name: 'Product B', price: 49.99 } }),
+      request.post('/api/products', { data: { name: 'Product C', price: 19.99 } }),
+    ]);
+    const products = await Promise.all(productsResponse.map(r => r.json()));
+    
+    // Create orders
+    const ordersResponse = await Promise.all([
+      request.post('/api/orders', {
+        data: {
+          userId: users[0].id,
+          items: [{ productId: products[0].id, quantity: 2 }]
+        }
+      }),
+      request.post('/api/orders', {
+        data: {
+          userId: users[1].id,
+          items: [
+            { productId: products[1].id, quantity: 1 },
+            { productId: products[2].id, quantity: 3 }
+          ]
+        }
+      }),
+    ]);
+    const orders = await Promise.all(ordersResponse.map(r => r.json()));
+    
+    const scenario = { users, products, orders };
+    
+    await use(scenario);
+    
+    // Cleanup all data
+    for (const order of orders) {
+      await request.delete(`/api/orders/${order.id}`);
+    }
+    for (const product of products) {
+      await request.delete(`/api/products/${product.id}`);
+    }
+    for (const user of users) {
+      await request.delete(`/api/users/${user.id}`);
+    }
+  },
+});
+
+Usage:
+
+test('admin dashboard stats', async ({ page, ecommerceScenario }) => {
+  await page.goto('/admin/dashboard');
+  
+  await expect(page.locator('.total-users')).toHaveText('2');
+  await expect(page.locator('.total-products')).toHaveText('3');
+  await expect(page.locator('.total-orders')).toHaveText('2');
+  
+  // Verify specific order details
+  const { orders, users, products } = ecommerceScenario;
+  await page.goto(`/admin/orders/${orders[0].id}`);
+  await expect(page.locator('.customer-name')).toHaveText(users[0].name);
+});
+
+6.4 Complex Workflow Fixtures
+------------------------------
+
+Multi-step workflow setup:
+
+type WorkflowFixtures = {
+  approvedInvoice: {
+    invoice: Invoice;
+    approver: User;
+  };
+};
+
+export const test = base.extend<WorkflowFixtures>({
+  approvedInvoice: async ({ request }, use) => {
+    // Step 1: Create approver user
+    const approverResponse = await request.post('/api/users', {
+      data: {
+        name: 'Approver',
+        email: 'approver@company.com',
+        role: 'manager'
+      }
+    });
+    const approver = await approverResponse.json();
+    
+    // Step 2: Create invoice
+    const invoiceResponse = await request.post('/api/invoices', {
+      data: {
+        amount: 5000,
+        description: 'Test invoice',
+        status: 'pending'
+      }
+    });
+    const invoice = await invoiceResponse.json();
+    
+    // Step 3: Submit for approval
+    await request.post(`/api/invoices/${invoice.id}/submit`, {});
+    
+    // Step 4: Approve invoice
+    await request.post(`/api/invoices/${invoice.id}/approve`, {
+      data: {
+        approverId: approver.id,
+        comments: 'Approved for testing'
+      }
+    });
+    
+    // Verify approval status
+    const updatedInvoice = await request.get(`/api/invoices/${invoice.id}`);
+    const invoiceData = await updatedInvoice.json();
+    expect(invoiceData.status).toBe('approved');
+    
+    await use({ invoice: invoiceData, approver });
+    
+    // Cleanup
+    await request.delete(`/api/invoices/${invoice.id}`);
+    await request.delete(`/api/users/${approver.id}`);
+  },
+});
+
+Usage:
+
+test('process approved invoice', async ({ page, approvedInvoice }) => {
+  const { invoice, approver } = approvedInvoice;
+  
+  await page.goto(`/invoices/${invoice.id}`);
+  
+  await expect(page.locator('.status')).toHaveText('Approved');
+  await expect(page.locator('.approver-name')).toHaveText(approver.name);
+  await expect(page.locator('.amount')).toHaveText('$5,000.00');
+  
+  // Process payment
+  await page.click('#process-payment');
+  await expect(page.locator('.status')).toHaveText('Paid');
+});
+
+================================================================================
+
+7. BEST PRACTICES
+==================
+
+7.1 When to Use Custom Fixtures
+--------------------------------
+
+✅ USE Fixtures When:
+- Setup logic is repeated across multiple tests
+- Need automatic cleanup
+- Want to compose dependencies
+- Building page objects
+- Setting up authentication
+- Creating test data
+- Mocking API responses
+- Complex multi-step setup
+
+❌ DON'T Use Fixtures When:
+- Setup is unique to one test (just do it in the test)
+- Simple one-liner setup
+- Over-engineering simple tests
+
+Example - Good Use Case:
+
+// ✅ GOOD: Reused authentication across many tests
+export const test = base.extend({
+  authenticatedPage: async ({ page }, use) => {
+    await page.goto('/login');
+    await page.fill('#username', 'testuser');
+    await page.click('#login');
+    await use(page);
+  },
+});
+
+// ✅ Used in 50+ tests
+test('dashboard', async ({ authenticatedPage }) => { /* ... */ });
+test('profile', async ({ authenticatedPage }) => { /* ... */ });
+test('settings', async ({ authenticatedPage }) => { /* ... */ });
+
+Example - Bad Use Case:
+
+// ❌ BAD: Only used once
+export const test = base.extend({
+  specificPageSetup: async ({ page }, use) => {
+    await page.goto('/specific-page');
+    await page.click('#specific-button');
+    await use(page);
+  },
+});
+
+// Only one test uses it - just do it in the test!
+test('specific test', async ({ specificPageSetup }) => { /* ... */ });
+
+// ✅ BETTER: Just do it in the test
+test('specific test', async ({ page }) => {
+  await page.goto('/specific-page');
+  await page.click('#specific-button');
+  // ... rest of test
+});
+
+7.2 Naming Conventions
+-----------------------
+
+✅ Good Naming:
+- authenticatedPage
+- adminUser
+- testDatabase
+- mockApiResponses
+- ecommerceScenario
+- loginPage
+- cartWithItems
+
+❌ Bad Naming:
+- myFixture
+- data
+- stuff
+- temp
+- x
+- fixture1
+
+Patterns:
+
+1. Descriptive Names:
+   authenticatedPage > authPage > ap
+
+2. Clear Purpose:
+   testUser > user (what kind of user?)
+   mockApi > api (mock vs real?)
+
+3. Type Indicator:
+   loginPage (Page Object)
+   userFixture (fixture providing user)
+   dbConnection (database)
+
+4. State Indicator:
+   emptyCart vs cartWithItems
+   newUser vs existingUser
+   authenticatedPage vs guestPage
+
+7.3 Cleanup and Resource Management
+------------------------------------
+
+✅ Always Cleanup:
+
+export const test = base.extend({
+  resource: async ({}, use) => {
+    const resource = await acquireResource();
+    
+    try {
+      await use(resource);
+    } finally {
+      // Guaranteed to run even if test fails
+      await releaseResource(resource);
+    }
+  },
+});
+
+✅ Database Transactions:
+
+export const test = base.extend({
+  db: async ({}, use) => {
+    const db = await connectToDatabase();
+    await db.query('BEGIN TRANSACTION');
+    
+    await use(db);
+    
+    await db.query('ROLLBACK'); // Always rollback test changes
+    await db.close();
+  },
+});
+
+✅ File Cleanup:
+
+export const test = base.extend({
+  testFile: async ({}, use) => {
+    const filePath = `/tmp/test-${Date.now()}.txt`;
+    await fs.writeFile(filePath, 'test data');
+    
+    await use(filePath);
+    
+    await fs.unlink(filePath); // Delete file after test
+  },
+});
+
+✅ API Resource Cleanup:
+
+export const test = base.extend({
+  testUser: async ({ request }, use) => {
+    const response = await request.post('/api/users', { data: { /* ... */ } });
+    const user = await response.json();
+    
+    await use(user);
+    
+    // Delete even if test failed
+    await request.delete(`/api/users/${user.id}`);
+  },
+});
+
+7.4 Common Patterns
+-------------------
+
+Pattern 1: Fixture Composition
+
+type ComposedFixtures = {
+  apiToken: string;
+  authenticatedRequest: RequestContext;
+  authenticatedPage: Page;
+};
+
+export const test = base.extend<ComposedFixtures>({
+  apiToken: async ({ request }, use) => {
+    const token = await getAuthToken(request);
+    await use(token);
+  },
+  
+  authenticatedRequest: async ({ request, apiToken }, use) => {
+    // Uses apiToken fixture
+    await use(createAuthRequest(request, apiToken));
+  },
+  
+  authenticatedPage: async ({ page, apiToken }, use) => {
+    // Uses apiToken fixture
+    await setupPageAuth(page, apiToken);
+    await use(page);
+  },
+});
+
+Pattern 2: Conditional Fixtures
+
+export const test = base.extend({
+  conditionalSetup: async ({ page, browserName }, use) => {
+    if (browserName === 'webkit') {
+      // Safari-specific setup
+      await page.addInitScript(() => {
+        window.safariPolyfill = true;
+      });
+    }
+    
+    await use(page);
+  },
+});
+
+Pattern 3: Parameterized Fixtures
+
+function createUserFixture(role: string) {
+  return async ({ request }, use) => {
+    const response = await request.post('/api/users', {
+      data: { role, username: `${role}_user` }
+    });
+    const user = await response.json();
+    
+    await use(user);
+    
+    await request.delete(`/api/users/${user.id}`);
+  };
+}
+
+export const test = base.extend({
+  adminUser: createUserFixture('admin'),
+  editorUser: createUserFixture('editor'),
+  viewerUser: createUserFixture('viewer'),
+});
+
+Pattern 4: Shared Worker Resource
+
+export const test = base.extend({
+  sharedCache: [async ({}, use) => {
+    const cache = new Map();
+    await use(cache);
+    // Cache is shared across all tests in worker
+    // Persists between tests
+  }, { scope: 'worker' }],
+});
+
+7.5 Anti-Patterns to Avoid
+---------------------------
+
+❌ Anti-Pattern 1: Overly Complex Fixtures
+
+// BAD: Too many responsibilities
+export const test = base.extend({
+  everythingFixture: async ({ page, request }, use) => {
+    await page.goto('/');
+    await page.click('#setup');
+    const response = await request.post('/api/setup');
+    await page.reload();
+    await page.waitForTimeout(5000);
+    await page.evaluate(() => window.customSetup());
+    // ... 50 more lines
+    await use(page);
+  },
+});
+
+// GOOD: Split into smaller fixtures
+export const test = base.extend({
+  setupPage: async ({ page }, use) => {
+    await page.goto('/');
+    await page.click('#setup');
+    await use(page);
+  },
+  
+  apiSetup: async ({ request }, use) => {
+    const response = await request.post('/api/setup');
+    await use(response);
+  },
+});
+
+❌ Anti-Pattern 2: Mutable Shared State
+
+// BAD: Worker-scoped mutable data
+export const test = base.extend({
+  sharedData: [async ({}, use) => {
+    const data = { counter: 0 }; // Mutable!
+    await use(data);
+  }, { scope: 'worker' }],
+});
+
+test('test 1', async ({ sharedData }) => {
+  sharedData.counter++; // Modifies shared state!
+});
+
+test('test 2', async ({ sharedData }) => {
+  console.log(sharedData.counter); // Depends on test 1 running first!
+});
+
+// GOOD: Immutable or test-scoped
+export const test = base.extend({
+  freshData: async ({}, use) => {
+    const data = { counter: 0 }; // Fresh for each test
+    await use(data);
+  },
+});
+
+❌ Anti-Pattern 3: Forgetting Cleanup
+
+// BAD: No cleanup
+export const test = base.extend({
+  testUser: async ({ request }, use) => {
+    const response = await request.post('/api/users', { /* ... */ });
+    const user = await response.json();
+    await use(user);
+    // User never deleted! Database fills up!
+  },
+});
+
+// GOOD: Always cleanup
+export const test = base.extend({
+  testUser: async ({ request }, use) => {
+    const response = await request.post('/api/users', { /* ... */ });
+    const user = await response.json();
+    
+    await use(user);
+    
+    await request.delete(`/api/users/${user.id}`);
+  },
+});
+
+❌ Anti-Pattern 4: Fixture for Every Little Thing
+
+// BAD: Over-using fixtures
+export const test = base.extend({
+  buttonLocator: async ({ page }, use) => {
+    await use(page.locator('button'));
+  },
+  
+  inputLocator: async ({ page }, use) => {
+    await use(page.locator('input'));
+  },
+  
+  // ... 20 more trivial fixtures
+});
+
+// GOOD: Just use page directly
+test('simple test', async ({ page }) => {
+  const button = page.locator('button');
+  const input = page.locator('input');
+  // ...
+});
+
+❌ Anti-Pattern 5: Hidden Dependencies
+
+// BAD: Fixture assumes global state
+export const test = base.extend({
+  userProfile: async ({ page }, use) => {
+    // Assumes user is already logged in!
+    await page.goto('/profile');
+    await use(page);
+  },
+});
+
+// GOOD: Explicit dependencies
+export const test = base.extend({
+  authenticatedPage: async ({ page }, use) => {
+    await page.goto('/login');
+    await page.fill('#username', 'user');
+    await page.click('#login');
+    await use(page);
+  },
+  
+  userProfile: async ({ authenticatedPage }, use) => {
+    // Explicitly depends on authenticatedPage
+    await authenticatedPage.goto('/profile');
+    await use(authenticatedPage);
+  },
+});
+
+================================================================================
+
+SUMMARY
+=======
+
+Fixtures are a powerful feature in Playwright that enable:
+
+✓ Automatic setup and teardown
+✓ Reusable test components
+✓ Clean, maintainable test code
+✓ Dependency injection
+✓ Composable test scenarios
+
+Key Takeaways:
+
+1. Use built-in fixtures ({ page }, { request }, etc.) for most tests
+2. Create custom fixtures for repeated setup logic
+3. Choose appropriate scope (test vs worker)
+4. Always cleanup resources
+5. Keep fixtures focused and composable
+6. Name fixtures descriptively
+7. Avoid over-engineering simple tests
+
+Master fixtures to write better, more maintainable Playwright tests!
+
+================================================================================

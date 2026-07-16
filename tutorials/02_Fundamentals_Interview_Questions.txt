@@ -1,0 +1,953 @@
+================================================================================
+PLAYWRIGHT FUNDAMENTALS - INTERVIEW QUESTIONS
+================================================================================
+Comprehensive Q&A covering Beginner, Intermediate, and Advanced levels
+Date: December 28, 2025
+
+================================================================================
+BEGINNER LEVEL QUESTIONS (1-25)
+================================================================================
+
+Q1: What is Playwright?
+A: Playwright is an open-source Node.js library developed by Microsoft for 
+   end-to-end testing of web applications. It allows you to automate browser 
+   interactions across Chromium, Firefox, and WebKit with a single unified API.
+
+Q2: Which browsers does Playwright support?
+A: Playwright supports three browser engines:
+   1. Chromium (Chrome, Edge)
+   2. Firefox
+   3. WebKit (Safari)
+   All with a single unified API.
+
+Q3: What are the main advantages of Playwright over Selenium?
+A: • Modern architecture (built in 2020 vs 2004)
+   • Auto-waiting built-in (no manual waits needed)
+   • Faster execution (WebSocket vs HTTP)
+   • Better reliability (direct browser protocol)
+   • Cross-browser with single API
+   • Microsoft-backed with active development
+
+Q4: What is the minimum Node.js version required for Playwright?
+A: Node.js version 18 or higher (18.x, 20.x, 22.x are supported).
+
+Q5: How do you install Playwright in a new project?
+A: npm init playwright@latest
+   This command creates a new project, installs Playwright, downloads browsers,
+   and sets up the basic structure with configuration files.
+
+Q6: What is the basic command to run Playwright tests?
+A: npx playwright test
+   Additional options:
+   • npx playwright test --headed (see browser)
+   • npx playwright test --ui (interactive mode)
+   • npx playwright test --debug (debug mode)
+
+Q7: What does the 'test' function do in Playwright?
+A: The 'test' function defines a test case. It:
+   • Registers the test with the test runner
+   • Provides an isolated execution context
+   • Receives fixtures (like page) as parameters
+   • Auto-cleans up after test completion
+
+Q8: What does the 'expect' function do?
+A: 'expect' is the assertion function that:
+   • Makes assertions about page state
+   • Auto-waits and retries until timeout
+   • Returns assertion object with various matchers
+   • Examples: toBeVisible(), toHaveText(), toHaveURL()
+
+Q9: What is the 'page' fixture in Playwright?
+A: 'page' is a built-in fixture that provides:
+   • A fresh browser page/tab for each test
+   • Automatically created before test
+   • Automatically cleaned up after test
+   • Main interface for browser interactions
+
+Q10: Why do we use 'async' and 'await' in Playwright tests?
+A: Because browser operations are asynchronous:
+   • 'async' marks the function as asynchronous
+   • 'await' pauses execution until operation completes
+   • This ensures proper sequencing of actions
+   • Prevents race conditions and timing issues
+
+Q11: What happens if you forget 'await' before a Playwright action?
+A: The action returns a Promise but doesn't wait for completion:
+   • Next line executes immediately
+   • Creates race conditions
+   • Can cause "element not found" errors
+   • Tests become flaky and unreliable
+
+Q12: What is a Browser Context in Playwright?
+A: A Browser Context is an isolated browsing session (like incognito mode):
+   • Has its own cookies, storage, cache
+   • Completely isolated from other contexts
+   • Multiple contexts can exist in one browser
+   • Automatically created for each test
+
+Q13: How does Playwright achieve test isolation?
+A: Playwright creates a fresh Browser Context for each test:
+   • New context before test starts
+   • Clean cookies, storage, and cache
+   • Context destroyed after test ends
+   • No state pollution between tests
+
+Q14: What is the difference between 'page', 'context', and 'browser' fixtures?
+A: • page: Single browser tab/page (most common)
+   • context: Browser context containing one or more pages
+   • browser: Browser instance that can create multiple contexts
+
+Q15: What file naming convention should Playwright test files follow?
+A: Test files should end with:
+   • .spec.ts or .spec.js (recommended)
+   • .test.ts or .test.js (also supported)
+   Example: login.spec.ts, checkout.spec.ts
+
+Q16: What is playwright.config.ts used for?
+A: It's the main configuration file that controls:
+   • Test directory location
+   • Browser projects to run
+   • Timeouts and retries
+   • Reporter configuration
+   • Base URL and other settings
+
+Q17: What does 'npx' do and why is it used with Playwright?
+A: npx (Node Package Executor):
+   • Executes packages without global installation
+   • Uses project-specific version
+   • Ensures consistency across team and CI/CD
+   • Example: npx playwright test
+
+Q18: What is the purpose of the 'use' block in playwright.config.ts?
+A: The 'use' block defines shared settings for all tests:
+   • baseURL for navigation
+   • viewport size
+   • screenshot/video settings
+   • browser options (headless, etc.)
+   • timeout configurations
+
+Q19: How do you run tests in headed mode (visible browser)?
+A: npx playwright test --headed
+   This opens a visible browser window so you can see tests execute.
+
+Q20: What is auto-waiting in Playwright?
+A: Auto-waiting means Playwright automatically waits for elements to be:
+   • Present in DOM
+   • Visible
+   • Stable (not animating)
+   • Enabled
+   • Ready to receive events
+   This eliminates need for manual waits and reduces flaky tests.
+
+Q21: What are the main folders in a Playwright project?
+A: • tests/ - Your test files
+   • node_modules/ - Dependencies
+   • test-results/ - Test artifacts (screenshots, videos)
+   • playwright-report/ - HTML test reports
+   • playwright.config.ts - Configuration file
+
+Q22: How do you view the HTML test report?
+A: npx playwright show-report
+   This opens an interactive HTML report in your browser showing test results,
+   screenshots, videos, and trace files.
+
+Q23: What is the difference between import { test } and import * as test?
+A: • import { test } - Named import (recommended, tree-shakeable)
+   • import * as test - Imports everything (not recommended)
+   Named imports are more efficient and make dependencies explicit.
+
+Q24: What does 'fullyParallel: true' do in the config?
+A: It enables full parallel execution:
+   • Tests within same file run in parallel
+   • Faster test execution
+   • Each test still gets isolated context
+   • Requires tests to be independent
+
+Q25: How do you skip a test?
+A: test.skip('test name', async ({ page }) => { });
+   Or conditionally:
+   test.skip(condition, 'reason');
+   The test will be marked as skipped in the report.
+
+
+================================================================================
+INTERMEDIATE LEVEL QUESTIONS (26-50)
+================================================================================
+
+Q26: Explain the Playwright architecture in simple terms.
+A: Three-layer architecture:
+   1. Your Test Code (JavaScript/TypeScript)
+   2. Playwright Library (Node.js) - communicates via WebSocket
+   3. Browser (Chromium/Firefox/WebKit) - controlled via DevTools Protocol
+   This direct protocol communication makes it faster and more reliable than
+   HTTP-based tools like Selenium.
+
+Q27: What is the worker model in Playwright?
+A: Playwright uses parallel workers:
+   • Main process discovers all tests
+   • Spawns workers (default: CPU cores / 2)
+   • Each worker launches one browser instance
+   • Tests distributed across workers
+   • Each test gets fresh context within worker's browser
+
+Q28: How does Playwright handle different browser engines?
+A: Single API, multiple protocols:
+   • Chromium: Uses Chrome DevTools Protocol
+   • Firefox: Uses Juggler (custom protocol)
+   • WebKit: Uses custom WebKit protocol
+   Playwright abstracts these differences, providing unified API.
+
+Q29: What are test fixtures in Playwright?
+A: Fixtures are pre-configured objects provided to tests:
+   • Built-in: page, context, browser, request, browserName
+   • Automatically created and destroyed
+   • Can be extended with custom fixtures
+   • Provide consistent test setup
+
+Q30: How do you create custom fixtures?
+A: Extend the base test:
+   import { test as base } from '@playwright/test';
+   
+   export const test = base.extend<{ myFixture: string }>({
+     myFixture: async ({}, use) => {
+       // Setup
+       await use('fixture value');
+       // Teardown
+     }
+   });
+
+Q31: What is the purpose of test.describe()?
+A: Groups related tests together:
+   • Organizes tests logically
+   • Shared beforeEach/afterEach hooks
+   • Can be nested for sub-groups
+   • Better reporting structure
+
+Q32: Explain test.beforeEach() and test.afterEach().
+A: Test hooks that run before/after each test in a describe block:
+   • beforeEach: Setup (e.g., navigation, login)
+   • afterEach: Cleanup (e.g., clear cookies)
+   • Run automatically for every test
+   • Can access same fixtures as tests
+
+Q33: What is test.beforeAll() used for?
+A: Runs once before all tests in a describe block:
+   • Expensive setup operations
+   • Database seeding
+   • Authentication state creation
+   • Shared across all tests in block
+   ⚠️ Use carefully - can create dependencies between tests
+
+Q34: How do you run only one specific test?
+A: test.only('test name', async ({ page }) => { });
+   Only tests marked with .only() will run.
+   ⚠️ Remove before committing!
+
+Q35: What does test.slow() do?
+A: Triples the timeout for a specific test:
+   • Use for genuinely slow operations
+   • Better than increasing global timeout
+   • Clearly marks expected slow tests
+   Example: Large file downloads, complex computations
+
+Q36: What is the difference between test.skip() and test.fixme()?
+A: • test.skip() - Intentionally skipped (feature not ready, browser-specific)
+   • test.fixme() - Known to fail, acknowledged issue, implies will be fixed
+   Both prevent test execution but communicate different intent.
+
+Q37: How do you pass configuration from command line?
+A: Use environment variables or config flags:
+   BASE_URL=https://staging.com npx playwright test
+   npx playwright test --config=playwright.config.staging.ts
+   Access in config: process.env.BASE_URL
+
+Q38: What are projects in playwright.config.ts?
+A: Projects define different test configurations:
+   • Different browsers (chromium, firefox, webkit)
+   • Different devices (iPhone, Android)
+   • Different environments (desktop, mobile)
+   • Can have dependencies between projects
+   Tests run once per configured project.
+
+Q39: How do you configure multiple browsers?
+A: In playwright.config.ts:
+   projects: [
+     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+     { name: 'webkit', use: { ...devices['Desktop Safari'] } }
+   ]
+   All tests run on all configured browsers.
+
+Q40: What is the 'retries' configuration option?
+A: Specifies how many times to retry failed tests:
+   retries: process.env.CI ? 2 : 0
+   • Helps handle flaky tests in CI
+   • 0 retries locally (fail fast)
+   • 2 retries in CI (account for network issues)
+
+Q41: Explain the 'workers' configuration option.
+A: Controls parallel test execution:
+   workers: process.env.CI ? 2 : undefined
+   • undefined = all CPU cores
+   • Number = specific worker count
+   • 1 = sequential execution
+   • More workers = faster but more resources
+
+Q42: What reporters are available in Playwright?
+A: Built-in reporters:
+   • 'list' - Console output
+   • 'html' - Interactive HTML report
+   • 'json' - JSON format for processing
+   • 'junit' - JUnit XML for CI integration
+   • 'dot' - Minimal dot output
+   • 'line' - One line per test
+
+Q43: How do you save authentication state?
+A: Use storageState:
+   // Save state
+   await context.storageState({ path: 'auth.json' });
+   
+   // Reuse state
+   test.use({ storageState: 'auth.json' });
+   
+   Skips login for subsequent tests.
+
+Q44: What is the purpose of baseURL in config?
+A: Sets the base URL for navigation:
+   use: { baseURL: 'https://example.com' }
+   
+   Then in tests:
+   await page.goto('/login');  // Goes to https://example.com/login
+   
+   Makes tests environment-independent.
+
+Q45: How do you handle different environments (dev, staging, prod)?
+A: Use environment variables:
+   const baseURL = {
+     dev: 'http://localhost:3000',
+     staging: 'https://staging.example.com',
+     prod: 'https://example.com'
+   }[process.env.ENV || 'dev'];
+   
+   Run: ENV=staging npx playwright test
+
+Q46: What is the 'timeout' option in playwright.config.ts?
+A: Sets default timeout for each test:
+   timeout: 30000  // 30 seconds per test
+   • Can be overridden per test
+   • Prevents tests from hanging indefinitely
+   • Different from expect timeout
+
+Q47: What is 'expect.timeout' used for?
+A: Sets timeout for assertions:
+   expect: { timeout: 5000 }  // 5 seconds
+   Assertions retry until this timeout expires.
+   Separate from test timeout.
+
+Q48: How do you run tests from a specific file?
+A: npx playwright test path/to/file.spec.ts
+   Or with pattern:
+   npx playwright test login
+   Runs all files matching "login"
+
+Q49: What is the purpose of .gitignore in Playwright projects?
+A: Prevents committing generated files:
+   • node_modules/ (dependencies)
+   • test-results/ (artifacts)
+   • playwright-report/ (reports)
+   • .env (secrets)
+   Keeps repository clean and secure.
+
+Q50: How do you debug a failing test?
+A: Multiple approaches:
+   1. npx playwright test --debug (Playwright Inspector)
+   2. await page.pause() (pause execution)
+   3. npx playwright test --headed (see browser)
+   4. npx playwright test --ui (interactive UI)
+   5. View trace in HTML report
+
+
+================================================================================
+ADVANCED LEVEL QUESTIONS (51-75)
+================================================================================
+
+Q51: Explain the Node.js event loop in context of Playwright.
+A: Event loop manages async operations:
+   1. Call Stack executes sync code
+   2. Async operations delegated to Web/C++ APIs
+   3. Callbacks queued when complete
+   4. Event loop moves callbacks to call stack when empty
+   
+   In Playwright:
+   • await page.goto() delegates to browser API
+   • Test pauses, event loop continues
+   • When navigation completes, callback queued
+   • Test resumes from await
+
+Q52: What happens under the hood when you call await page.click()?
+A: Multi-step process:
+   1. Playwright sends click command via WebSocket
+   2. Browser protocol receives command
+   3. Auto-waiting checks (visible, stable, enabled, etc.)
+   4. If checks fail, retries until timeout
+   5. When actionable, performs click
+   6. Click event propagates in browser
+   7. Result returned to Playwright
+   8. Promise resolves, test continues
+
+Q53: How does Playwright's auto-waiting work internally?
+A: Protocol-level implementation:
+   1. Action command includes actionability checks
+   2. Browser continuously evaluates element state
+   3. Polls every ~100ms for actionability
+   4. When all conditions met, executes action
+   5. If timeout reached, throws error
+   
+   Conditions checked:
+   • Element exists in DOM
+   • Attached to document
+   • Visible
+   • Stable (not animating)
+   • Enabled (if applicable)
+   • Not obscured by other elements
+
+Q54: What is the difference between locator and element handle?
+A: • Locator: Lazy evaluation, auto-retries, recommended
+     const button = page.locator('button');
+     await button.click();  // Locates fresh each time
+   
+   • ElementHandle: Eager evaluation, direct DOM reference, discouraged
+     const button = await page.$('button');
+     await button.click();  // Uses cached reference (can become stale)
+   
+   Locators are more reliable for dynamic content.
+
+Q55: How does Playwright handle stale element references?
+A: It doesn't have this problem:
+   • Locators are lazy (don't reference elements)
+   • Each action locates element fresh from DOM
+   • No stale element exceptions
+   • Works seamlessly with dynamic content/SPAs
+
+Q56: Explain the browser download and caching mechanism.
+A: Browser binary management:
+   • Download triggered by: npx playwright install
+   • Location: OS-specific cache directory
+   • Versioned: Browser binaries tied to Playwright version
+   • Shared: Same browser used across projects with same Playwright version
+   • Size: ~300-500MB total for all browsers
+   • Updates: New Playwright version may download new browsers
+
+Q57: How do you implement Page Object Model in Playwright?
+A: Class-based pattern:
+   export class LoginPage {
+     constructor(private page: Page) {}
+     
+     private emailInput = this.page.locator('#email');
+     private passwordInput = this.page.locator('#password');
+     private submitButton = this.page.locator('#submit');
+     
+     async login(email: string, password: string) {
+       await this.emailInput.fill(email);
+       await this.passwordInput.fill(password);
+       await this.submitButton.click();
+     }
+   }
+   
+   // Usage
+   const loginPage = new LoginPage(page);
+   await loginPage.login('user@test.com', 'pass123');
+
+Q58: What are the trade-offs of using shared state between tests?
+A: Shared State (via beforeAll):
+   Pros:
+   • Faster (one-time expensive setup)
+   • Useful for read-only operations
+   
+   Cons:
+   • Tests not truly independent
+   • Harder to debug failures
+   • Can't run in random order
+   • Parallel execution limited
+   
+   Isolated State (default):
+   Pros:
+   • True test independence
+   • Parallel-safe
+   • Easier debugging
+   
+   Cons:
+   • Slower (repeated setup)
+   
+   Recommendation: Prefer isolation, use shared state only when necessary.
+
+Q59: How does Playwright handle screenshots and videos differently?
+A: Screenshots:
+   • On-demand or on-failure
+   • Synchronous capture
+   • Smaller file size
+   • Full page or specific element
+   • Configuration: screenshot: 'only-on-failure'
+   
+   Videos:
+   • Continuous recording
+   • Asynchronous processing
+   • Larger file size
+   • Entire test execution
+   • Configuration: video: 'retain-on-failure'
+   
+   Trade-off: Videos provide full context, screenshots faster and smaller.
+
+Q60: What is trace recording and when should you use it?
+A: Trace records full test execution:
+   • Network requests/responses
+   • DOM snapshots at each action
+   • Console logs
+   • Screenshots
+   • Action timeline
+   
+   Configuration: trace: 'on-first-retry'
+   
+   Use when:
+   • Debugging flaky tests
+   • Investigating CI failures
+   • Understanding complex interactions
+   
+   Trade-off: Large files, performance overhead.
+
+Q61: How do you handle authentication at scale?
+A: Global setup pattern:
+   1. Create global-setup.ts:
+      export default async function globalSetup() {
+        const browser = await chromium.launch();
+        const page = await browser.newPage();
+        await page.goto('/login');
+        await page.fill('#email', 'user@test.com');
+        await page.fill('#password', 'password');
+        await page.click('#login');
+        await page.context().storageState({ path: 'auth.json' });
+        await browser.close();
+      }
+   
+   2. Configure in playwright.config.ts:
+      globalSetup: require.resolve('./global-setup'),
+      use: { storageState: 'auth.json' }
+   
+   3. All tests start authenticated
+
+Q62: What is the webServer option in config?
+A: Starts local dev server before tests:
+   webServer: {
+     command: 'npm run start',
+     url: 'http://localhost:3000',
+     reuseExistingServer: !process.env.CI,
+     timeout: 120000
+   }
+   
+   • Automatically starts server
+   • Waits for URL to be available
+   • Runs tests
+   • Shuts down server after tests
+   • Useful for CI pipelines
+
+Q63: How do you run tests in CI/CD effectively?
+A: Best practices:
+   1. Use Docker containers for consistency
+   2. Install system dependencies: npx playwright install --with-deps
+   3. Enable retries: retries: 2
+   4. Limit workers: workers: 2 (CI resources)
+   5. Upload artifacts: test-results, playwright-report
+   6. Use JUnit reporter for integration
+   7. Cache node_modules and browsers
+   8. Run different browsers in parallel jobs
+
+Q64: What are the differences between Playwright Test and Playwright Library?
+A: Playwright Test (@playwright/test):
+   • Test runner included
+   • Built-in fixtures
+   • Automatic parallelization
+   • Reporter system
+   • Retry logic
+   • Configuration management
+   • Best for E2E testing
+   
+   Playwright Library (playwright):
+   • No test runner
+   • Manual setup required
+   • Use with any test runner (Jest, Mocha)
+   • Lower-level control
+   • Best for automation scripts, scraping
+
+Q65: How do you handle file uploads in Playwright?
+A: Use setInputFiles:
+   // Single file
+   await page.locator('#file').setInputFiles('path/to/file.pdf');
+   
+   // Multiple files
+   await page.locator('#files').setInputFiles([
+     'file1.pdf',
+     'file2.jpg'
+   ]);
+   
+   // From buffer
+   await page.locator('#file').setInputFiles({
+     name: 'file.txt',
+     mimeType: 'text/plain',
+     buffer: Buffer.from('file content')
+   });
+
+Q66: How do you handle file downloads?
+A: Use download event:
+   const downloadPromise = page.waitForEvent('download');
+   await page.click('#download-button');
+   const download = await downloadPromise;
+   
+   // Get filename
+   const filename = download.suggestedFilename();
+   
+   // Save file
+   await download.saveAs('path/to/save.pdf');
+   
+   // Or get stream
+   const stream = await download.createReadStream();
+
+Q67: What is the purpose of test.step()?
+A: Creates hierarchical test steps for better reporting:
+   test('complex flow', async ({ page }) => {
+     await test.step('Login', async () => {
+       await page.goto('/login');
+       await page.fill('#email', 'user@test.com');
+       await page.click('#login');
+     });
+     
+     await test.step('Navigate to dashboard', async () => {
+       await page.click('#dashboard');
+     });
+   });
+   
+   Reports show nested steps, easier debugging.
+
+Q68: How do you parallelize tests effectively?
+A: Multiple strategies:
+   1. File-level: Different files run in parallel by default
+   2. Within-file: fullyParallel: true in config
+   3. Sharding: Split test suite across machines
+      npx playwright test --shard=1/3
+      npx playwright test --shard=2/3
+      npx playwright test --shard=3/3
+   
+   Considerations:
+   • Ensure tests are independent
+   • Manage shared resources (databases)
+   • Monitor system resources
+
+Q69: What is test sharding and when to use it?
+A: Splitting test suite across multiple machines:
+   Machine 1: --shard=1/4
+   Machine 2: --shard=2/4
+   Machine 3: --shard=3/4
+   Machine 4: --shard=4/4
+   
+   Use when:
+   • Large test suite (>1000 tests)
+   • Need faster CI feedback
+   • Have available compute resources
+   
+   Each shard runs subset of tests, results combined later.
+
+Q70: How does Playwright compare to Cypress architecturally?
+A: Playwright:
+   • Runs outside browser (Node.js)
+   • Multiple browsers/tabs/contexts
+   • True parallelization
+   • Network interception at protocol level
+   • Cross-browser support
+   
+   Cypress:
+   • Runs inside browser
+   • Single tab at a time
+   • Limited parallelization (paid)
+   • Network interception via service worker
+   • Chromium-family only (mostly)
+   
+   Playwright more flexible for complex scenarios.
+
+Q71: What are the best practices for organizing test files?
+A: Recommended structure:
+   tests/
+   ├── features/           # Feature-based grouping
+   │   ├── auth/
+   │   │   ├── login.spec.ts
+   │   │   └── signup.spec.ts
+   │   └── cart/
+   │       └── checkout.spec.ts
+   ├── smoke/              # Smoke tests
+   │   └── critical-paths.spec.ts
+   └── regression/         # Full regression suite
+   
+   Benefits:
+   • Logical organization
+   • Easy to find tests
+   • Selective execution (npx playwright test features/auth)
+   • Clear test categories
+
+Q72: How do you manage test data effectively?
+A: Multiple approaches:
+   1. Test data files:
+      import testData from './fixtures/users.json';
+   
+   2. Data generators:
+      function generateUser() {
+        return {
+          email: `user-${Date.now()}@test.com`,
+          name: 'Test User'
+        };
+      }
+   
+   3. API setup:
+      test.beforeEach(async ({ request }) => {
+        await request.post('/api/users', {
+          data: testUser
+        });
+      });
+   
+   4. Database seeding:
+      In global setup or beforeAll
+
+Q73: What is the role of TypeScript in Playwright?
+A: TypeScript provides:
+   • Type safety (catch errors at compile time)
+   • Better IDE autocomplete
+   • Refactoring support
+   • Documentation through types
+   • Optional (can use JavaScript)
+   
+   Playwright is written in TypeScript, has excellent type definitions.
+   Recommended for large test suites.
+
+Q74: How do you handle environment-specific configuration?
+A: Multiple config files:
+   playwright.config.ts           # Default
+   playwright.config.dev.ts       # Development
+   playwright.config.staging.ts   # Staging
+   playwright.config.prod.ts      # Production
+   
+   Run with:
+   npx playwright test --config=playwright.config.staging.ts
+   
+   Or use environment variables:
+   const config = {
+     baseURL: process.env.BASE_URL || 'http://localhost:3000'
+   };
+
+Q75: What are the performance considerations for large test suites?
+A: Optimization strategies:
+   1. Maximize parallelization (workers, sharding)
+   2. Use authentication state reuse (avoid repeated logins)
+   3. Minimize expensive operations in beforeEach
+   4. Use API for test data setup (faster than UI)
+   5. Disable video/screenshots except on failure
+   6. Use lightweight traces (only on retry)
+   7. Consider test suite segmentation (smoke vs full)
+   8. Cache dependencies in CI
+   9. Use fast assertion timeouts
+   10. Profile and optimize slow tests
+
+
+================================================================================
+SCENARIO-BASED QUESTIONS (76-85)
+================================================================================
+
+Q76: Your tests pass locally but fail in CI. How do you debug?
+A: Troubleshooting steps:
+   1. Enable traces in CI: trace: 'on'
+   2. Download and view trace from CI artifacts
+   3. Check for timing issues (add retries)
+   4. Verify baseURL is correct for CI environment
+   5. Ensure browser dependencies installed (--with-deps)
+   6. Check for environment-specific issues (ports, services)
+   7. Run in headed mode locally to see behavior
+   8. Review CI logs for errors
+   9. Consider resource constraints (memory, CPU)
+
+Q77: How do you test a complex multi-step checkout flow?
+A: Organize with test.step() and page objects:
+   test('complete checkout', async ({ page }) => {
+     await test.step('Add items to cart', async () => {
+       // Cart operations
+     });
+     
+     await test.step('Enter shipping info', async () => {
+       // Shipping form
+     });
+     
+     await test.step('Enter payment', async () => {
+       // Payment details
+     });
+     
+     await test.step('Review and confirm', async () => {
+       // Final review
+     });
+     
+     await test.step('Verify order confirmation', async () => {
+       // Confirmation page
+     });
+   });
+
+Q78: How do you handle tests that need to run sequentially?
+A: Use test.describe.serial():
+   test.describe.serial('sequential tests', () => {
+     test('test 1', async ({ page }) => {
+       // Must run first
+     });
+     
+     test('test 2', async ({ page }) => {
+       // Runs after test 1
+     });
+   });
+   
+   Or reduce workers: workers: 1
+   ⚠️ Use sparingly - prefer independent tests.
+
+Q79: How do you test across multiple user sessions simultaneously?
+A: Use multiple contexts:
+   test('chat between users', async ({ browser }) => {
+     const context1 = await browser.newContext();
+     const context2 = await browser.newContext();
+     
+     const user1 = await context1.newPage();
+     const user2 = await context2.newPage();
+     
+     // User 1 actions
+     await user1.goto('/chat');
+     
+     // User 2 actions
+     await user2.goto('/chat');
+     
+     // Verify interaction
+     await user1.fill('#message', 'Hello');
+     await user1.click('#send');
+     await expect(user2.locator('.message')).toHaveText('Hello');
+     
+     await context1.close();
+     await context2.close();
+   });
+
+Q80: Your test suite has become slow. How do you optimize it?
+A: Performance optimization checklist:
+   1. Profile: Identify slowest tests
+   2. Parallelize: Ensure fullyParallel: true
+   3. Authentication: Use storageState to skip repeated logins
+   4. API Setup: Use API instead of UI for data setup
+   5. Selective Testing: Run smoke tests in PR, full suite nightly
+   6. Workers: Increase workers (if resources available)
+   7. Sharding: Distribute across machines
+   8. Cleanup: Remove redundant/duplicate tests
+   9. Timeouts: Reduce where appropriate
+   10. Traces: Only on-first-retry
+
+Q81: How do you handle flaky tests?
+A: Strategies to eliminate flakiness:
+   1. Identify: Run same test multiple times
+   2. Enable retries: retries: 2
+   3. Check auto-waiting: Ensure using proper locators
+   4. Review timing: Remove manual waits, use expect assertions
+   5. Isolate: Ensure proper test isolation
+   6. Traces: Enable to see what's happening
+   7. Environment: Check for resource constraints
+   8. Fix root cause: Don't just add retries
+   9. Mark as fixme: test.fixme() until resolved
+   10. Monitor: Track flaky test patterns
+
+Q82: How do you test responsive designs across devices?
+A: Use device emulation:
+   projects: [
+     {
+       name: 'Desktop Chrome',
+       use: { ...devices['Desktop Chrome'] }
+     },
+     {
+       name: 'iPhone 12',
+       use: { ...devices['iPhone 12'] }
+     },
+     {
+       name: 'iPad Pro',
+       use: { ...devices['iPad Pro'] }
+     }
+   ]
+   
+   Or custom viewports:
+   use: {
+     viewport: { width: 375, height: 667 }
+   }
+
+Q83: How do you integrate Playwright with existing test frameworks?
+A: Playwright Library approach:
+   // With Jest
+   import { chromium } from 'playwright';
+   
+   let browser, page;
+   
+   beforeAll(async () => {
+     browser = await chromium.launch();
+   });
+   
+   beforeEach(async () => {
+     page = await browser.newPage();
+   });
+   
+   test('example', async () => {
+     await page.goto('https://example.com');
+     expect(await page.title()).toBe('Example');
+   });
+   
+   afterAll(async () => {
+     await browser.close();
+   });
+
+Q84: How do you handle tests that require database state?
+A: Multiple approaches:
+   1. API Setup:
+      test.beforeEach(async ({ request }) => {
+        await request.post('/api/reset-db');
+        await request.post('/api/seed-data');
+      });
+   
+   2. Database Direct:
+      test.beforeAll(async () => {
+        await db.migrate.latest();
+        await db.seed.run();
+      });
+   
+   3. Fixtures:
+      export const test = base.extend({
+        dbSetup: async ({}, use) => {
+          await setupDatabase();
+          await use();
+          await teardownDatabase();
+        }
+      });
+
+Q85: How do you implement continuous testing in CI/CD?
+A: Complete CI/CD pipeline:
+   1. On PR: Run smoke tests
+   2. On merge: Run full regression
+   3. Nightly: Run extended tests
+   4. Use different configs per stage
+   5. Upload artifacts (reports, traces)
+   6. Integrate with status checks
+   7. Parallelize across runners
+   8. Cache dependencies
+   9. Fail fast on critical tests
+   10. Alert on failures
+
+
+================================================================================
+END OF INTERVIEW QUESTIONS
+================================================================================
+Total Questions: 85
+Difficulty Distribution:
+- Beginner: 25 questions (Q1-Q25)
+- Intermediate: 25 questions (Q26-Q50)
+- Advanced: 25 questions (Q51-Q75)
+- Scenario-based: 10 questions (Q76-Q85)

@@ -1,0 +1,1481 @@
+================================================================================
+                    PLAYWRIGHT ACTIONS - INTERVIEW QUESTIONS GUIDE
+            Master These Questions to Ace Your Playwright Interview
+================================================================================
+
+Source: https://playwright.dev/docs/input
+Interview Format: Comprehensive Q&A with Model Answers
+
+ANSWER STRUCTURE FOR ALL QUESTIONS:
+
+1. DEFINITION (20 seconds)
+   └─ What is it in clear, simple language?
+
+2. KEY POINTS (30 seconds)
+   └─ 3-4 main characteristics
+
+3. EXAMPLE (30-40 seconds)
+   └─ Code example showing usage
+
+4. WHY IT MATTERS (20 seconds)
+   └─ Benefits or use case
+
+TOTAL: ~2 minutes per question
+
+
+================================================================================
+Q0: WHAT'S THE DIFFERENCE BETWEEN inputValue() AND textContent()?
+================================================================================
+
+INTERVIEWER: "Can you explain when to use inputValue() vs textContent()? 
+This is a common source of test failures."
+
+DEFINITION (20 seconds)
+────────────────────────
+"inputValue() gets the VALUE attribute of form inputs (<input>, <textarea>, 
+<select>). textContent() gets the displayed text of ANY element. They return 
+different things for the same element."
+
+KEY DIFFERENCES (40 seconds)
+──────────────────────────────
+inputValue():
+  ✓ For FORM INPUTS ONLY (<input>, <textarea>, <select>)
+  ✓ Returns VALUE attribute (what's in the field)
+  ✓ Returns null if not a form input
+  ✓ Used for: Getting form field values
+
+textContent():
+  ✓ For ANY element (button, div, span, link, etc.)
+  ✓ Returns displayed text content
+  ✓ For inputs, returns empty string
+  ✓ Used for: Getting button text, labels, messages
+
+WHY IT MATTERS (20 seconds)
+────────────────────────────
+"Using the wrong method is a common cause of test failures. If you use 
+textContent() on an input field, it returns empty string. If you use 
+inputValue() on a button, it returns null. Understanding the difference 
+prevents these hard-to-debug failures."
+
+EXAMPLE CODE (50 seconds)
+──────────────────────────
+
+// EXAMPLE 1: Input Field
+const emailInput = page.locator('#email');
+await emailInput.fill('user@example.com');
+
+const value = await emailInput.inputValue();      // "user@example.com" ✓
+const text = await emailInput.textContent();      // "" (empty) ✗
+
+// Use inputValue() for inputs!
+
+// EXAMPLE 2: Button Element
+const submitBtn = page.locator('button');
+
+const value = await submitBtn.inputValue();       // null ✗
+const text = await submitBtn.textContent();       // "Submit" ✓
+
+// Use textContent() for buttons!
+
+// EXAMPLE 3: Select Dropdown
+const select = page.locator('#country');
+await select.selectOption('us');
+
+const value = await select.inputValue();          // "us" ✓
+const text = await select.textContent();          // "United States\nCanada" ✗
+
+// Use inputValue() to get selected value!
+
+QUICK REFERENCE TABLE
+──────────────────────
+Element Type        │ Use This           │ Returns Example
+────────────────────┼────────────────────┼────────────────────────
+<input type="text"> │ inputValue()       │ "user entered text"
+<textarea>          │ inputValue()       │ "textarea content"
+<select>            │ inputValue()       │ "selected_value"
+<button>            │ textContent()      │ "Button Text"
+<a> (link)          │ textContent()      │ "Click Here"
+<div> <span>        │ textContent()      │ "Div content here"
+<h1> <p>            │ textContent()      │ "Heading or paragraph"
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "What if I accidentally use textContent on an input?
+
+A: "It returns empty string '', which will fail your assertion. That's why 
+many tests fail silently - they get empty string and expect "user@example.com". 
+Always use inputValue() for form inputs."
+
+Q: "Can I use textContent on textarea?
+
+A: "Yes, it works for textarea, but inputValue() is the standard method for 
+form inputs. Consistency is important in test code."
+
+Q: "How do I get the LABEL of a selected dropdown option, not the value?
+
+A: "Use inputValue() for the VALUE, but for the LABEL text, query the 
+selected option separately:
+const label = await select.locator('option:checked').textContent();
+This returns the displayed text, not the value."
+
+
+================================================================================
+Q1: WHAT ARE PLAYWRIGHT ACTIONS? EXPLAIN THEIR IMPORTANCE
+================================================================================
+
+INTERVIEWER: "Can you explain what Playwright actions are and why they matter
+in test automation?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"Playwright actions are methods that simulate real user interactions with 
+HTML elements. They replicate how actual users interact with web applications 
+through clicks, text input, keyboard navigation, and other interactions."
+
+KEY POINTS (30 seconds)
+────────────────────────
+✓ Simulate real user behavior (not just DOM manipulation)
+✓ Automatically wait for element actionability
+✓ Handle all necessary events (input, change, focus, blur)
+✓ Work consistently across Chromium, Firefox, and WebKit
+
+WHY IT MATTERS (20 seconds)
+────────────────────────────
+"Actions ensure our tests reflect actual user behavior. This is critical 
+because:
+  • Tests more accurately validate the application
+  • Catch issues that DOM manipulation misses
+  • More reliable and maintainable tests
+  • Actionability checks prevent flaky tests"
+
+EXAMPLE CODE (40 seconds)
+──────────────────────────
+// User interaction: Click a button
+await page.getByRole('button', { name: 'Submit' }).click();
+
+// Behind the scenes, Playwright:
+// 1. Finds the element
+// 2. Waits for it to be visible
+// 3. Waits for it to be clickable
+// 4. Scrolls it into view
+// 5. Triggers all events (pointerover, pointerdown, etc.)
+// 6. Actually clicks it
+// 7. Waits for response
+
+// Don't do this (bad practice):
+await page.evaluate(() => {
+  document.querySelector('button').click();  // Not realistic
+});
+
+FOLLOW-UP QUESTIONS & ANSWERS
+──────────────────────────────
+
+Q: "What's the difference between click() and dispatchEvent('click')?
+
+A: "click() simulates real user interaction - waits for visibility, scrolls 
+into view, triggers all pointer events. dispatchEvent('click') just fires a 
+JavaScript click event without checks. Use click() for realistic testing, 
+dispatchEvent() only when testing click handlers specifically."
+
+Q: "Can actions work on hidden elements?
+
+A: "By default, no. Actions wait for actionability, so hidden elements fail. 
+You can use { force: true } to bypass checks, but this is not recommended 
+as it doesn't simulate real user behavior."
+
+
+================================================================================
+Q2: EXPLAIN fill() METHOD AND WHEN TO USE IT VS pressSequentially()
+================================================================================
+
+INTERVIEWER: "What's the difference between fill() and pressSequentially() 
+methods? When would you use each one?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"fill() is a high-level method that clears a field and types text as if the 
+user pasted it. pressSequentially() types character by character, emitting 
+keyboard events for each character."
+
+KEY DIFFERENCES (40 seconds)
+──────────────────────────────
+┌──────────────────┬──────────────┬──────────────────────┐
+│ Feature          │ fill()       │ pressSequentially()  │
+├──────────────────┼──────────────┼──────────────────────┤
+│ Speed            │ Fast         │ Slow (delays/char)   │
+│ Keyboard events  │ Input event  │ Keydown/up events    │
+│ User behavior    │ Paste        │ Real typing          │
+│ Use case         │ 90% of time  │ Special handlers     │
+│ Clear existing   │ Yes          │ No                   │
+│ Delay option     │ No           │ Yes                  │
+└──────────────────┴──────────────┴──────────────────────┘
+
+WHEN TO USE fill()
+───────────────────
+✓ Normal form filling (most cases)
+✓ Text inputs, textareas
+✓ Date/time inputs
+✓ Fast test execution
+
+WHEN TO USE pressSequentially()
+────────────────────────────────
+✓ Testing autocomplete handlers
+✓ Character-by-character validation
+✓ Testing real keyboard events
+✓ Testing password field masking
+✓ Testing input event listeners
+
+EXAMPLE CODE
+─────────────
+// Use fill() - simple and fast
+test('login form', async ({ page }) => {
+  await page.getByLabel('Email').fill('user@example.com');
+  await page.getByLabel('Password').fill('password123');
+  await page.getByRole('button', { name: 'Login' }).click();
+});
+
+// Use pressSequentially() - when testing behavior
+test('autocomplete', async ({ page }) => {
+  const input = page.getByLabel('Search');
+  
+  // Type character by character to trigger autocomplete
+  await input.pressSequentially('java', { delay: 100 });
+  
+  // Verify suggestions appear
+  await expect(page.getByRole('option')).toHaveCount(5);
+});
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "What happens internally when you call fill()?
+
+A: "fill() focuses the element, clears existing text with Ctrl+A and Delete, 
+then types the new text. All in one atomic operation with a single input 
+event."
+
+Q: "Can you use fill() on password fields?
+
+A: "Yes, absolutely. fill() works on all input types including password, 
+email, date, etc."
+
+
+================================================================================
+Q3: EXPLAIN CHECK(), UNCHECK(), AND setChecked() METHODS
+================================================================================
+
+INTERVIEWER: "How do you interact with checkboxes and radio buttons in 
+Playwright?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"check() checks a checkbox or radio button, uncheck() unchecks a checkbox, 
+and setChecked() sets the state based on a boolean value."
+
+KEY CHARACTERISTICS (35 seconds)
+──────────────────────────────────
+✓ Works on <input type="checkbox">, <input type="radio">
+✓ Also works on [role="checkbox"] elements
+✓ Automatically clicks to change state
+✓ Only clicks if state needs to change (idempotent)
+✓ Radio buttons are mutually exclusive
+
+EXAMPLE CODE
+─────────────
+test('checkbox operations', async ({ page }) => {
+  // Check checkbox
+  await page.getByLabel('I agree to terms').check();
+  
+  // Verify it's checked
+  await expect(page.getByLabel('I agree to terms')).toBeChecked();
+  
+  // Uncheck (only works for checkbox, not radio)
+  await page.getByLabel('Subscribe').uncheck();
+  
+  // Use setChecked for dynamic control
+  const shouldAgree = true;
+  await page.getByLabel('Terms').setChecked(shouldAgree);
+});
+
+test('radio buttons', async ({ page }) => {
+  // Select radio button
+  await page.getByLabel('Small').check();
+  await expect(page.getByLabel('Small')).toBeChecked();
+  
+  // Switch to another - automatically unchecks first
+  await page.getByLabel('Large').check();
+  await expect(page.getByLabel('Large')).toBeChecked();
+  await expect(page.getByLabel('Small')).not.toBeChecked();
+});
+
+COMMON ASSERTION METHODS
+─────────────────────────
+// Check state
+await expect(checkbox).toBeChecked();
+await expect(checkbox).not.toBeChecked();
+
+// Checkbox only (radio has no unchecked assertion)
+await expect(checkbox).toBeChecked();
+await expect(checkbox).toBeVisible();
+await expect(checkbox).toBeEnabled();
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "What's the difference between check() and click() for checkboxes?
+
+A: "check() is semantic - it only clicks if the element isn't already 
+checked, and waits for actionability. click() is lower-level and always 
+clicks regardless. Use check() for clarity."
+
+Q: "Can you uncheck a radio button?
+
+A: "No, radio buttons are mutually exclusive. You can only select one. If 
+you call uncheck() on a radio button, it will throw an error. Check another 
+option instead."
+
+
+================================================================================
+Q4: HOW DO YOU HANDLE SELECT DROPDOWNS WITH selectOption()?
+================================================================================
+
+INTERVIEWER: "Walk me through how you'd interact with a dropdown select 
+element in Playwright."
+
+DEFINITION (20 seconds)
+────────────────────────
+"selectOption() selects one or more options from an HTML <select> element. 
+You can select by value, label, or index."
+
+SELECTION METHODS (30 seconds)
+────────────────────────────────
+1. By value: selectOption('red')
+2. By label: selectOption({ label: 'Red Color' })
+3. By index: selectOption({ index: 0 })
+4. Multiple: selectOption(['red', 'green']) // if multiple select
+
+EXAMPLE CODE
+─────────────
+test('select operations', async ({ page }) => {
+  await page.goto('https://example.com/form');
+  
+  // Select by value
+  const select = page.getByLabel('Country');
+  await select.selectOption('US');
+  
+  // Select by label
+  await select.selectOption({ label: 'United States' });
+  
+  // Select by index (0-based)
+  await select.selectOption({ index: 0 });
+  
+  // Verify selection
+  await expect(select).toHaveValue('US');
+});
+
+test('single select', async ({ page }) => {
+  const select = page.getByLabel('Choose Color');
+  
+  // Select single option
+  await select.selectOption('red');
+  
+  // Verify single selection
+  await expect(select).toHaveValue('red');
+});
+
+HANDLING DYNAMIC SELECTS (40 seconds)
+──────────────────────────────────────
+// Get all available options first
+const select = page.getByLabel('Category');
+const options = await select.locator('option').allTextContents();
+
+if (options.includes('Electronics')) {
+  await select.selectOption('Electronics');
+}
+
+// Handle cascade selects (dependent dropdowns)
+await page.getByLabel('Country').selectOption('USA');
+await page.waitForFunction(() => {
+  return document.querySelectorAll('option').length > 10;
+});
+await page.getByLabel('State').selectOption('California');
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "What if an option doesn't exist in the dropdown?
+
+A: "selectOption() will throw a TimeoutError. You should verify options exist 
+first using allTextContents() or catch the error gracefully."
+
+Q: "Can selectOption() handle optgroup elements?
+
+A: "Yes, it can select options inside optgroup elements using the same 
+methods (by value, label, or index)."
+
+Q: "How do you handle multiple select dropdowns?
+
+A: "Use selectOption() with an array of values. Only works if the <select> 
+element has the 'multiple' attribute. You can verify selections with 
+toHaveValues() which expects an array."
+
+
+================================================================================
+Q4.5: ADVANCED MULTI-SELECT DROPDOWN HANDLING
+================================================================================
+
+INTERVIEWER: "Walk me through how you would handle a multi-select dropdown 
+where users can select multiple options. What are the edge cases?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"Multi-select dropdowns allow users to select multiple options from a 
+<select multiple> element. Playwright provides methods to select, deselect, 
+and verify multiple selections using different selector strategies."
+
+KEY CONCEPTS FOR MULTI-SELECT (45 seconds)
+──────────────────────────────────────────────
+1. REQUIRES: <select multiple> attribute
+2. SELECTION METHODS:
+   - By value: selectOption(['red', 'green', 'blue'])
+   - By label: selectOption([{label: 'Red'}, {label: 'Green'}])
+   - By index: selectOption([{index: 0}, {index: 2}])
+   - MIXED: selectOption(['red', {label: 'Green'}, {index: 4}])
+3. DESELECTION: selectOption([]) - clears all selections
+4. VERIFICATION: toHaveValues(['value1', 'value2'])
+
+EXAMPLE CODE: MULTI-SELECT PATTERNS
+──────────────────────────────────────
+
+// Pattern 1: Select multiple by value
+test('select multiple options by value', async ({ page }) => {
+  const multiSelect = page.getByLabel('Choose Colors');
+  
+  // Select multiple values
+  await multiSelect.selectOption(['red', 'white', 'green', 'yellow']);
+  
+  // Verify all selected
+  await expect(multiSelect).toHaveValues(['red', 'white', 'green', 'yellow']);
+});
+
+// Pattern 2: Select multiple by label
+test('select multiple options by label', async ({ page }) => {
+  const multiSelect = page.locator('#colors');
+  
+  // Select by labels
+  await multiSelect.selectOption([
+    { label: 'Blue' },
+    { label: 'White' },
+    { label: 'Green' }
+  ]);
+  
+  // Verify using evaluate() for custom checks
+  const selectedLabels = await multiSelect.evaluate(() => {
+    const selected = document.querySelectorAll('option:checked');
+    return Array.from(selected).map((option: any) => option.label);
+  });
+  
+  expect(selectedLabels).toEqual(['Blue', 'White', 'Green']);
+});
+
+// Pattern 3: Select by index with mixed strategies
+test('select multiple options by index', async ({ page }) => {
+  const multiSelect = page.locator('select[multiple]');
+  
+  // Select by index positions
+  await multiSelect.selectOption([
+    { index: 0 },   // First option
+    { index: 2 },   // Third option
+    { index: 4 }    // Fifth option
+  ]);
+  
+  // Verify count of selections
+  const selectedCount = await multiSelect.evaluate(() => {
+    return document.querySelectorAll('option:checked').length;
+  });
+  
+  expect(selectedCount).toBe(3);
+});
+
+// Pattern 4: Clear all selections and re-select
+test('deselect all then reselect', async ({ page }) => {
+  const multiSelect = page.getByLabel('Multi-Select');
+  
+  // First select multiple options
+  await multiSelect.selectOption(['option1', 'option2', 'option3']);
+  await expect(multiSelect).toHaveValues(['option1', 'option2', 'option3']);
+  
+  // Clear all selections
+  await multiSelect.selectOption([]);
+  
+  // Verify empty
+  const deselectedValues = await multiSelect.evaluate(() => {
+    return Array.from(document.querySelectorAll('option:checked'))
+      .map((opt: any) => opt.value);
+  });
+  
+  expect(deselectedValues).toEqual([]);
+  
+  // Re-select new options
+  await multiSelect.selectOption(['option2', 'option4']);
+  await expect(multiSelect).toHaveValues(['option2', 'option4']);
+});
+
+// Pattern 5: Retrieve all available options and select subset
+test('retrieve options then select specific ones', async ({ page }) => {
+  const multiSelect = page.locator('#colors');
+  
+  // Get all available options
+  const allOptions = await multiSelect.locator('option').allTextContents();
+  console.log('All available options:', allOptions);
+  
+  // Get total count
+  const optionsCount = await multiSelect.locator('option').count();
+  console.log(`Total options: ${optionsCount}`);
+  
+  // Select only specific ones
+  const toSelect = allOptions.slice(0, 3); // First 3 options
+  await multiSelect.selectOption(toSelect);
+  
+  // Verify count
+  const selectedCount = await multiSelect.evaluate(() => {
+    return document.querySelectorAll('option:checked').length;
+  });
+  
+  expect(selectedCount).toEqual(toSelect.length);
+});
+
+// Pattern 6: Progressive selection (add one by one)
+test('progressive selection pattern', async ({ page }) => {
+  const multiSelect = page.getByLabel('Colors');
+  
+  // Step 1: Select first option
+  await multiSelect.selectOption('red');
+  let selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length);
+  expect(selectedCount).toBe(1);
+  
+  // Step 2: Add more options (replace with all)
+  await multiSelect.selectOption(['red', 'green', 'blue']);
+  selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length);
+  expect(selectedCount).toBe(3);
+  
+  // Step 3: Deselect one by selecting all except that one
+  await multiSelect.selectOption(['red', 'blue']);
+  selectedCount = await multiSelect.evaluate(() => 
+    document.querySelectorAll('option:checked').length);
+  expect(selectedCount).toBe(2);
+});
+
+EDGE CASES & COMMON PITFALLS (40 seconds)
+──────────────────────────────────────────
+1. MISSING 'multiple' ATTRIBUTE
+   ✗ Problem: selectOption(['val1', 'val2']) works but only last value selected
+   ✓ Solution: Verify <select multiple> exists in HTML
+   
+2. TIMING ISSUES WITH DYNAMIC OPTIONS
+   ✗ Problem: Options load asynchronously, selectOption() can't find them
+   ✓ Solution: Use waitForFunction() to wait for options to populate
+   
+3. CLEARING SELECTIONS
+   ✗ Problem: How do you deselect specific options?
+   ✓ Solution: Call selectOption([]) to clear all, then re-select what you want
+   
+4. VERIFICATION FAILURES
+   ✗ Problem: toHaveValues() fails due to order or case sensitivity
+   ✓ Solution: Use evaluate() to get actual values and compare with custom logic
+   
+5. OPTION VALUES VS LABELS
+   ✗ Problem: Selecting by label but HTML has different values
+   ✓ Solution: Inspect HTML to see actual value/label attributes
+
+INTERVIEW SCENARIO (60 seconds)
+──────────────────────────────────
+INTERVIEWER: "We have a multi-select dropdown for color preferences on our 
+checkout page. It's dynamically loaded from an API. Users can select multiple 
+colors. How would you write a robust test?"
+
+YOUR ANSWER:
+"I would:
+1. Wait for the select element to have multiple attribute
+2. Wait for option elements to load (waitForFunction)
+3. Use evaluate() to inspect current options before selecting
+4. Select using the safest method (verify options exist first)
+5. Use evaluate() for verification instead of toHaveValues() for more control
+6. Test edge cases: empty selections, clearing selections, max selections"
+
+EXAMPLE SOLUTION:
+test('multi-select color preferences with dynamic loading', async ({ page }) => {
+  // Navigate to checkout
+  await page.goto('/checkout');
+  
+  const colorSelect = page.getByLabel(/colors/i);
+  
+  // Wait for options to load
+  await page.waitForFunction(() => {
+    const options = document.querySelectorAll('#colors option');
+    return options.length > 3; // Expect at least 4 options
+  });
+  
+  // Check available options
+  const availableOptions = await colorSelect.locator('option')
+    .allTextContents();
+  console.log('Available colors:', availableOptions);
+  
+  // Only select colors that actually exist
+  const desiredColors = ['Red', 'Blue', 'Green'].filter(
+    color => availableOptions.includes(color)
+  );
+  
+  // Select the colors
+  await colorSelect.selectOption(
+    desiredColors.map(label => ({ label }))
+  );
+  
+  // Verify selection using evaluate for reliable check
+  const selectedValues = await colorSelect.evaluate(() => {
+    return Array.from(document.querySelectorAll('option:checked'))
+      .map((opt: any) => opt.value);
+  });
+  
+  expect(selectedValues.length).toBeGreaterThan(0);
+});
+
+FOLLOW-UP QUESTIONS
+─────────────────────
+
+Q: "Can you select a multi-select option that already is selected?
+
+A: "Calling selectOption() with an already-selected value is safe and 
+idempotent - it won't create duplicates. Playwright handles it gracefully."
+
+Q: "What's the difference between clearing with selectOption([]) vs selecting 
+a single option?
+
+A: "selectOption([]) sets the value to empty, unselecting all. Selecting a 
+single option keeps that selected while potentially unselecting others, 
+depending on how many you select."
+
+Q: "How do you test a multi-select with dependent behavior (max 3 selections)?
+
+A: "Select 3 items, verify all 3 are selected. Then try selecting a 4th, 
+and verify the select still has only 3 (either via JavaScript error or UI 
+update). Test both the happy path and the constraint."
+
+Q: "What if you need to select all options in a multi-select?
+
+A: "Use evaluate() to get all option values, then pass them to selectOption(). 
+Or use selectOption with all index values if order matters."
+
+
+================================================================================
+Q5: DESCRIBE MOUSE CLICK INTERACTIONS AND THEIR VARIATIONS
+================================================================================
+
+INTERVIEWER: "What are the different types of clicks you can perform in 
+Playwright? Provide examples."
+
+DEFINITION (20 seconds)
+────────────────────────
+"click() performs a mouse click. You can customize it to do single clicks, 
+double clicks, right clicks, or clicks with keyboard modifiers."
+
+CLICK VARIATIONS (40 seconds)
+──────────────────────────────
+┌──────────────┬────────────────┬─────────────────────────┐
+│ Type         │ Method/Option  │ Example                 │
+├──────────────┼────────────────┼─────────────────────────┤
+│ Single click │ click()        │ await button.click()    │
+│ Double click │ dblclick()     │ await item.dblclick()   │
+│ Right click  │ {button:right} │ click({button:'right'}) │
+│ Shift+click  │ {modifiers}    │ click({modifiers:[...]})│
+│ Ctrl+click   │ {modifiers}    │ click({modifiers:[...]})│
+│ Position     │ {position}     │ click({position:{...}}) │
+│ Force        │ {force}        │ click({force:true})     │
+└──────────────┴────────────────┴─────────────────────────┘
+
+EXAMPLE CODE
+─────────────
+test('click variations', async ({ page }) => {
+  // Single click
+  await page.getByRole('button', { name: 'Submit' }).click();
+  
+  // Double click (to select/edit)
+  await page.getByText('Item').dblclick();
+  
+  // Right click (context menu)
+  await page.getByText('Delete').click({ button: 'right' });
+  
+  // Shift + click (range select)
+  await page.getByText('Item1').click({ modifiers: ['Shift'] });
+  await page.getByText('Item10').click({ modifiers: ['Shift'] });
+  
+  // Ctrl/Cmd + click (open in new tab)
+  await page.getByRole('link').click({ 
+    modifiers: ['ControlOrMeta'] 
+  });
+  
+  // Click at specific position
+  await page.getByRole('button').click({
+    position: { x: 10, y: 10 }
+  });
+  
+  // Force click (bypass actionability - avoid!)
+  await page.getByRole('button').click({ force: true });
+});
+
+WHAT HAPPENS DURING click() (40 seconds)
+──────────────────────────────────────────
+When you call click(), Playwright:
+  1. Finds element matching locator
+  2. Waits for actionability (visible, enabled, not covered)
+  3. Scrolls element into view
+  4. Calculates click position (center by default)
+  5. Moves mouse to position
+  6. Fires pointer events (pointerover, pointerdown)
+  7. Actually clicks (real browser click)
+  8. Fires more events (pointerup, click)
+  9. Waits for any resulting network activity
+
+DISPATCHED VS REAL CLICK (30 seconds)
+──────────────────────────────────────
+
+Real click (recommended):
+  await button.click();  // Simulates real user click
+
+Programmatic click (not recommended):
+  await page.evaluate(() => {
+    document.querySelector('button').click();  // Just fires click event
+  });
+
+Dispatch click event (for testing):
+  await button.dispatchEvent('click');  // Only fires event, no pointer events
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "What does { force: true } do?
+
+A: "It bypasses all actionability checks. The element doesn't need to be 
+visible, enabled, or non-covered. Use only in rare cases where you know 
+the element will become visible soon."
+
+Q: "How do you click an element at a specific coordinate?
+
+A: "Use { position: { x: 50, y: 50 } } where coordinates are relative to 
+the element's position, not absolute page coordinates."
+
+
+================================================================================
+Q6: EXPLAIN KEYBOARD ACTIONS - press() VS pressSequentially()
+================================================================================
+
+INTERVIEWER: "How do you handle keyboard interactions in Playwright? What's 
+the difference between press() and pressSequentially()?"
+
+DEFINITION (25 seconds)
+────────────────────────
+"press() presses a single key or key combination (like Ctrl+A). 
+pressSequentially() types text character by character. Both trigger 
+keyboard events."
+
+KEY DIFFERENCES (35 seconds)
+──────────────────────────────
+┌──────────────────┬──────────┬──────────────────────┐
+│ Feature          │ press()  │ pressSequentially()  │
+├──────────────────┼──────────┼──────────────────────┤
+│ Input           │ Key name │ Text string          │
+│ Speed           │ Instant  │ With delay           │
+│ Events emitted  │ 1 set    │ Multiple sets        │
+│ Use case        │ Keys     │ Typing text          │
+│ Modifiers       │ Yes      │ No                   │
+│ Delay option    │ No       │ Yes                  │
+└──────────────────┴──────────┴──────────────────────┘
+
+EXAMPLE CODE - press()
+────────────────────────
+test('keyboard presses', async ({ page }) => {
+  const input = page.getByRole('textbox');
+  
+  // Single keys
+  await input.press('Enter');        // Submit
+  await input.press('Escape');       // Close modal
+  await input.press('Tab');          // Move to next
+  await input.press('Backspace');    // Delete char
+  
+  // Key combinations
+  await input.press('Control+A');    // Select all
+  await input.press('Control+C');    // Copy
+  await input.press('Control+V');    // Paste
+  await input.press('Shift+Tab');    // Previous field
+  await input.press('Control+Shift+P'); // Multi-modifier
+  
+  // Function keys
+  await page.press('F1');
+  await page.press('F12');
+  
+  // Arrow keys
+  await page.press('ArrowUp');
+  await page.press('ArrowDown');
+});
+
+EXAMPLE CODE - pressSequentially()
+────────────────────────────────────
+test('sequential typing', async ({ page }) => {
+  const input = page.getByRole('textbox');
+  
+  // Type with default speed (instantaneous)
+  await input.pressSequentially('Hello World');
+  
+  // Type with delay (100ms between characters)
+  await input.pressSequentially('password123', { delay: 100 });
+  
+  // Use for autocomplete testing
+  await input.pressSequentially('java', { delay: 50 });
+  await expect(page.getByRole('option')).toHaveCount(5);
+});
+
+SPECIAL KEYBOARD PATTERNS (40 seconds)
+───────────────────────────────────────
+// Form submission
+await page.getByLabel('Password').press('Enter');
+
+// Search with autocomplete
+await page.getByLabel('Search').pressSequentially('laptop', { delay: 50 });
+await page.press('Enter');
+
+// Navigate dropdown with arrows
+const select = page.getByLabel('Category');
+await select.focus();
+await page.press('ArrowDown');
+await page.press('ArrowDown');
+await page.press('Enter');
+
+// Undo/Redo
+await page.press('Control+Z');      // Undo
+await page.press('Control+Shift+Z'); // Redo
+
+SUPPORTED KEY NAMES (30 seconds)
+──────────────────────────────────
+Single keys:
+  Backspace, Tab, Delete, Escape, Enter
+  F1-F12
+  Digit0-9, KeyA-KeyZ
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight
+  Home, End, PageUp, PageDown
+  Insert
+
+Modifiers:
+  Shift, Control, Alt, Meta
+
+Combinations:
+  Shift+A (capital A)
+  Control+A (select all)
+  Control+Shift+K (multi-key)
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "Why is 'Shift+A' capital but 'shift+a' is lowercase?
+
+A: "Because 'A' and 'a' produce different characters. 'Shift+a' still 
+produces lowercase a. You must specify the actual character you want."
+
+Q: "Can you mix modifier keys?
+
+A: "Yes, like Control+Shift+K. The modifiers are pressed and held while 
+the final key is pressed."
+
+
+================================================================================
+Q7: HOW DO YOU HANDLE FILE UPLOADS WITH setInputFiles()?
+================================================================================
+
+INTERVIEWER: "Walk me through how you'd test file uploads. What are the 
+different approaches?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"setInputFiles() sets files for a file input element. You can pass file 
+paths, multiple files, or buffers created in memory."
+
+FILE INPUT METHODS (35 seconds)
+─────────────────────────────────
+1. Single file path:   setInputFiles('path/to/file.pdf')
+2. Multiple files:     setInputFiles(['file1.txt', 'file2.pdf'])
+3. Buffer from memory: setInputFiles({ name, mimeType, buffer })
+4. Directory:          setInputFiles('path/to/directory')
+5. Clear files:        setInputFiles([])
+
+EXAMPLE CODE
+─────────────
+import path from 'path';
+
+test('file upload variations', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  // Upload single file
+  const filePath = path.join(__dirname, 'resume.pdf');
+  await page.getByLabel('Upload Resume').setInputFiles(filePath);
+  
+  // Upload multiple files
+  const files = [
+    path.join(__dirname, 'document1.pdf'),
+    path.join(__dirname, 'document2.docx')
+  ];
+  await page.getByLabel('Upload Files').setInputFiles(files);
+  
+  // Upload from memory (no actual file needed)
+  await page.getByLabel('Upload').setInputFiles({
+    name: 'test.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Test file content')
+  });
+  
+  // Clear selection
+  await page.getByLabel('Upload').setInputFiles([]);
+});
+
+FILE CHOOSER EVENT PATTERN (40 seconds)
+─────────────────────────────────────────
+// When file input is created dynamically, wait for file chooser event
+test('dynamic file upload', async ({ page }) => {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  
+  // Click to open file chooser
+  await page.getByText('Upload Document').click();
+  
+  // Get chooser and set files
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(
+    path.join(__dirname, 'document.pdf')
+  );
+  
+  // Wait for upload to complete
+  await page.waitForNavigation();
+  await expect(page.getByText('Upload successful')).toBeVisible();
+});
+
+VERIFICATION PATTERNS (30 seconds)
+─────────────────────────────────────
+test('verify file upload', async ({ page }) => {
+  const fs = require('fs');
+  const testFile = path.join(__dirname, 'test.pdf');
+  
+  // Verify file exists before upload
+  expect(fs.existsSync(testFile)).toBe(true);
+  
+  // Upload
+  await page.getByLabel('Upload').setInputFiles(testFile);
+  
+  // Verify in UI
+  await expect(page.getByText('test.pdf')).toBeVisible();
+  await expect(page.getByText('Upload successful')).toBeVisible();
+  
+  // Verify file count
+  const fileCount = await page.locator(
+    'input[type="file"]'
+  ).evaluate((el: any) => el.files.length);
+  expect(fileCount).toBe(1);
+});
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "What MIME types should I use for different files?
+
+A: "
+  - PDF: application/pdf
+  - Word: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+  - Excel: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+  - Image: image/png, image/jpeg
+  - Text: text/plain
+"
+
+Q: "Can you upload a folder with setInputFiles()?
+
+A: "Yes, pass the folder path: setInputFiles('path/to/folder')"
+
+
+================================================================================
+Q8: WHAT IS ACTIONABILITY? WHEN AND HOW DOES IT APPLY?
+================================================================================
+
+INTERVIEWER: "Explain actionability in Playwright. What checks does it 
+perform?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"Actionability is a set of automatic checks Playwright performs before any 
+action to ensure the element can be interacted with realistically. It waits 
+for the element to be in a state where a real user could interact with it."
+
+ACTIONABILITY CHECKS (50 seconds)
+───────────────────────────────────
+Playwright waits for 6 conditions:
+
+1. PRESENCE: Element is in DOM
+2. VISIBILITY: Not hidden (display:none, visibility:hidden, opacity:0)
+3. STABILITY: Element is not moving (CSS animations complete)
+4. POSITIONING: Element is in viewport or will be scrolled
+5. COVERAGE: Element is not covered by another element
+6. INTERACTIVITY: Element receives pointer events at click position
+
+EXAMPLE - Actionability in Action (40 seconds)
+────────────────────────────────────────────────
+// This simple click does a lot behind the scenes:
+await page.getByRole('button').click();
+
+// Playwright automatically:
+// 1. Waits for button to be in DOM
+// 2. Waits for button to be visible (not display:none)
+// 3. Waits for button to be enabled (not disabled attribute)
+// 4. Waits for CSS transitions to complete
+// 5. Scrolls button into view if needed
+// 6. Checks no modal/overlay covers the button
+// 7. Then performs the click
+
+// If button doesn't become actionable within 30 seconds: TIMEOUT
+
+BYPASSING ACTIONABILITY (30 seconds)
+──────────────────────────────────────
+// Force click (not recommended!)
+await page.getByRole('button').click({ force: true });
+
+// This bypasses all checks and just clicks
+// Use only when:
+//   • You know element will become visible soon
+//   • Testing implementation details
+//   • No better alternative exists
+
+// Better alternative: Wait for the condition
+await expect(page.getByRole('button')).toBeEnabled();
+await page.getByRole('button').click();
+
+COMMON ACTIONABILITY ERRORS (40 seconds)
+──────────────────────────────────────────
+Error: "element is not visible"
+Fix:   await expect(element).toBeVisible();
+       Check CSS: display, visibility, opacity
+
+Error: "element is covered by other element"
+Fix:   Close the covering element
+       Or use { force: true } if absolutely necessary
+
+Error: "element is not enabled"
+Fix:   await expect(element).toBeEnabled();
+       Ensure it doesn't have disabled attribute
+
+Error: "timeout waiting for element to be stable"
+Fix:   Increase timeout: { timeout: 60000 }
+       Wait for animations: await page.waitForLoadState()
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "What's the default actionability timeout?
+
+A: "30 seconds. Configurable globally in playwright.config.ts or per action 
+with { timeout: 60000 }."
+
+Q: "Does actionability apply to all actions?
+
+A: "Yes, all pointer actions (click, fill, select, etc.) wait for 
+actionability. Keyboard actions are less strict."
+
+
+================================================================================
+Q9: EXPLAIN DRAG AND DROP IN PLAYWRIGHT
+================================================================================
+
+INTERVIEWER: "How do you test drag and drop functionality? What are the 
+approaches?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"Drag and drop is tested using dragTo() for simple drags or manual drag 
+using hover(), mouse.down(), mouse.move(), and mouse.up() for precise control."
+
+TWO APPROACHES (40 seconds)
+─────────────────────────────
+1. SIMPLE dragTo() (90% of cases)
+   └─ await source.dragTo(target)
+   └─ Handles all steps automatically
+
+2. MANUAL DRAG (10% of cases)
+   └─ Using mouse.down(), mouse.move(), mouse.up()
+   └─ For apps needing multiple dragover events
+
+EXAMPLE CODE - dragTo()
+────────────────────────
+test('simple drag and drop', async ({ page }) => {
+  await page.goto('https://example.com/dnd');
+  
+  const source = page.locator('#item-to-drag');
+  const target = page.locator('#drop-zone');
+  
+  // Simple drag
+  await source.dragTo(target);
+  
+  // Verify item moved
+  await expect(target).toContainText('item-to-drag');
+});
+
+EXAMPLE CODE - Manual Drag
+─────────────────────────────
+test('manual drag with control', async ({ page }) => {
+  await page.goto('https://example.com/dnd');
+  
+  const source = page.locator('#item-to-drag');
+  const target = page.locator('#drop-zone');
+  
+  // Manual drag sequence (for apps needing multiple hovers)
+  await source.hover();              // Hover source
+  await page.mouse.down();           // Press mouse
+  await target.hover();              // Move to target
+  await target.hover();              // Move again (for dragover)
+  await page.mouse.up();             // Release
+  
+  // Alternative with coordinates
+  await source.hover();
+  await page.mouse.down();
+  await page.mouse.move(500, 300);  // Move to coordinate
+  await page.mouse.move(500, 300);  // Move again
+  await page.mouse.up();
+});
+
+DRAG WITH OPTIONS (30 seconds)
+────────────────────────────────
+// Drag with delay
+await source.dragTo(target, { 
+  delay: 500  // 500ms between mousedown and mouseup
+});
+
+// Drag with force (bypass actionability)
+await source.dragTo(target, { force: true });
+
+// Drag with timeout
+await source.dragTo(target, { timeout: 60000 });
+
+DRAG MULTIPLE ITEMS (35 seconds)
+──────────────────────────────────
+test('drag multiple items', async ({ page }) => {
+  const items = page.locator('.draggable');
+  const dropZone = page.locator('.drop-zone');
+  
+  // Drag all items sequentially
+  const count = await items.count();
+  for (let i = 0; i < count; i++) {
+    await items.nth(i).dragTo(dropZone);
+    await page.waitForTimeout(200);  // Delay between drags
+  }
+});
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "Why do you sometimes need to hover twice in manual drag?
+
+A: "Some browsers require two mousemove events to properly trigger dragover 
+events. The first hover moves to the target, the second ensures the dragover 
+event fires."
+
+Q: "Can you drag from outside the page?
+
+A: "No, Playwright can only drag elements within the page. You can't drag 
+files from the file system into the browser."
+
+
+================================================================================
+Q10: HOW DO YOU HANDLE SCROLLING AND WHEN IS IT NECESSARY?
+================================================================================
+
+INTERVIEWER: "When do you need to manually scroll in tests? How do you test 
+scrolling?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"Playwright automatically scrolls elements into view for actions, but you 
+sometimes need manual scrolling for testing scroll behavior, infinite lists, 
+or positioning for screenshots."
+
+AUTO-SCROLL (MOST COMMON) (30 seconds)
+───────────────────────────────────────
+// Playwright automatically scrolls - no action needed
+await page.getByText('Footer Button').click();  // Auto-scrolls into view
+
+// Manual scroll only needed when:
+// • Testing scroll behavior explicitly
+// • Forcing infinite list to load more items
+// • Positioning page for screenshot
+// • Testing scroll event handlers
+
+MANUAL SCROLLING METHODS (40 seconds)
+──────────────────────────────────────
+1. scrollIntoViewIfNeeded()
+   └─ Scroll specific element into view
+
+2. mouse.wheel()
+   └─ Scroll with mouse wheel
+
+3. page.evaluate()
+   └─ Programmatic scroll
+
+4. Keyboard presses
+   └─ PageDown, PageUp, Home, End
+
+EXAMPLE CODE
+─────────────
+test('scrolling patterns', async ({ page }) => {
+  await page.goto('https://example.com/long-page');
+  
+  // Auto-scroll (happens automatically)
+  const footer = page.getByText('Footer');
+  await footer.click();  // Auto-scrolled
+  
+  // Manual scroll into view
+  await page.getByText('Section 5').scrollIntoViewIfNeeded();
+  
+  // Mouse wheel scroll
+  await page.mouse.wheel(0, 10);   // Scroll down
+  await page.mouse.wheel(0, -10);  // Scroll up
+  
+  // Programmatic scroll
+  await page.evaluate(() => {
+    window.scrollBy(0, 500);  // Scroll down 500px
+  });
+  
+  // Keyboard scroll
+  await page.press('PageDown');
+  await page.press('Home');
+});
+
+INFINITE LIST PATTERN (40 seconds)
+────────────────────────────────────
+test('infinite list load', async ({ page }) => {
+  await page.goto('https://example.com/infinite');
+  
+  // Get initial item count
+  let items = page.locator('.item');
+  let count = await items.count();
+  console.log('Initial:', count);
+  
+  // Scroll to bottom to trigger load
+  const loadingIndicator = page.getByText('Loading...');
+  await loadingIndicator.scrollIntoViewIfNeeded();
+  
+  // Wait for new items to load
+  await page.waitForFunction(async () => {
+    const newCount = await page.locator('.item').count();
+    return newCount > count;
+  });
+  
+  // Get new count
+  count = await page.locator('.item').count();
+  console.log('After scroll:', count);
+});
+
+FOLLOW-UP QUESTIONS
+────────────────────
+
+Q: "Does every action cause scrolling?
+
+A: "Only pointer actions (click, dragTo, etc.). Keyboard and fill() actions 
+also scroll but less noticeably."
+
+Q: "How do you test scroll event listeners?
+
+A: "Use page.evaluate() to scroll and then verify state changes or DOM 
+updates."
+
+
+================================================================================
+Q11: WHAT IS THE DIFFERENCE BETWEEN force: true AND NORMAL CLICKS?
+================================================================================
+
+INTERVIEWER: "When would you use { force: true }? What are the implications?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"{ force: true } bypasses all actionability checks and performs the action 
+directly. It simulates an action on an element that may be hidden or covered."
+
+NORMAL CLICK vs FORCE CLICK (40 seconds)
+──────────────────────────────────────────
+Normal Click (recommended):
+  ✓ Waits for visibility
+  ✓ Waits for element to be enabled
+  ✓ Scrolls into view
+  ✓ Checks element not covered
+  ✓ Simulates real user behavior
+  ✓ Reliable and stable tests
+
+Force Click (avoid):
+  ✗ Skips all checks
+  ✗ Doesn't wait for visibility
+  ✗ Doesn't scroll
+  ✗ Can click covered elements
+  ✗ Doesn't simulate real behavior
+  ✗ Tests implementation, not UX
+
+WHEN TO USE FORCE: true (30 seconds)
+──────────────────────────────────────
+// RARELY needed. Only when:
+// • Element will become visible immediately
+// • Testing specific implementation detail
+// • No better alternative exists
+// • You understand the risks
+
+Example (not recommended):
+  await page.getByRole('button').click({ force: true });
+
+BETTER ALTERNATIVES (40 seconds)
+──────────────────────────────────
+// Instead of { force: true }, use:
+
+// 1. Wait for element to be visible
+await expect(button).toBeVisible();
+await button.click();
+
+// 2. Wait for animation to complete
+await page.waitForTimeout(500);
+await button.click();
+
+// 3. Close the covering element
+await modal.click(); // Close modal
+await button.click();
+
+// 4. Handle dynamically appearing elements
+await page.waitForSelector('#button');
+await page.getByRole('button').click();
+
+FOLLOW-UP QUESTION
+───────────────────
+
+Q: "What's wrong with using { force: true }?
+
+A: "It tests implementation details, not user experience. A real user can't 
+click a hidden element. Tests should match how actual users interact with 
+your app."
+
+
+================================================================================
+Q12: EXPLAIN FOCUS() AND ITS USE CASES
+================================================================================
+
+INTERVIEWER: "What is focus() and when would you use it in tests?"
+
+DEFINITION (20 seconds)
+────────────────────────
+"focus() sets keyboard focus to an element, triggering the focus event. Used 
+for testing focus-related behavior, focus events, and keyboard interactions."
+
+USE CASES (35 seconds)
+────────────────────────
+✓ Test focus event handlers
+✓ Prepare element for keyboard input (press())
+✓ Test focus-dependent styling (:focus selector)
+✓ Verify focus order (tab navigation)
+✓ Test accessibility features
+✓ Test autofocus on page load
+
+EXAMPLE CODE
+─────────────
+test('focus usage', async ({ page }) => {
+  // Focus an element
+  await page.getByLabel('Email').focus();
+  
+  // Verify which element is focused
+  const focused = await page.evaluate(() => {
+    return document.activeElement?.id;
+  });
+  expect(focused).toBe('email-input');
+});
+
+test('focus with keyboard input', async ({ page }) => {
+  // Focus doesn't automatically type - use with press()
+  const input = page.getByLabel('Search');
+  await input.focus();
+  
+  // Now type (keyboard goes to focused element)
+  await page.press('Control+A');
+  await page.press('Delete');
+  await page.pressSequentially('laptop', { delay: 50 });
+});
+
+test('focus styling', async ({ page }) => {
+  const input = page.getByRole('textbox');
+  
+  // Before focus - no outline
+  await expect(input).not.toHaveClass('focused');
+  
+  // Focus
+  await input.focus();
+  
+  // After focus - outline visible
+  await expect(input).toHaveClass('focused');
+});
+
+test('focus order', async ({ page }) => {
+  const email = page.getByLabel('Email');
+  const password = page.getByLabel('Password');
+  
+  // Start at email
+  await email.focus();
+  
+  // Tab to password
+  await page.press('Tab');
+  
+  // Verify focus moved
+  const focused = await page.evaluate(() => {
+    return document.activeElement?.id;
+  });
+  expect(focused).toBe('password-input');
+});
+
+FOCUS VS CLICK (30 seconds)
+─────────────────────────────
+click():     Simulates mouse click + focus
+focus():     Only sets keyboard focus
+
+// These are different:
+await button.click();     // Click + focus
+await button.focus();     // Only focus, no click
+await button.press('Enter'); // Needs focus first
+
+FOLLOW-UP QUESTION
+───────────────────
+
+Q: "Do you need to call focus() before pressing keys?
+
+A: "Not always. Most methods auto-focus (fill, click, press). But explicitly 
+calling focus() can help with complex interactions or testing focus behavior."
+
+
+================================================================================
+END OF INTERVIEW GUIDE
+================================================================================
+
+QUICK REFERENCE: Action Methods
+
+┌─────────────────┬───────────┬──────────────┬─────────────────┐
+│ Action          │ Method    │ Returns      │ Common Options  │
+├─────────────────┼───────────┼──────────────┼─────────────────┤
+│ Fill text       │ fill()    │ Promise      │ timeout         │
+│ Type chars      │ press*    │ Promise      │ delay           │
+│ Check box       │ check()   │ Promise      │ timeout, force  │
+│ Uncheck box     │ uncheck() │ Promise      │ timeout, force  │
+│ Select option   │ select*   │ Promise      │ timeout         │
+│ Click element   │ click()   │ Promise      │ button, mods    │
+│ Double click    │ dblclick()│ Promise      │ timeout         │
+│ Right click     │ click()   │ Promise      │ button: 'right' │
+│ Upload file     │ setInput* │ Promise      │ timeout         │
+│ Focus element   │ focus()   │ Promise      │ timeout         │
+│ Drag to target  │ dragTo()  │ Promise      │ delay, timeout  │
+│ Scroll view     │ scroll*   │ Promise      │ timeout         │
+└─────────────────┴───────────┴──────────────┴─────────────────┘
+
+* See complete guide for detailed syntax
+

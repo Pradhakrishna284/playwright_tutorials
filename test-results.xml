@@ -1,0 +1,68 @@
+<testsuites id="" name="" tests="4" failures="1" skipped="0" errors="0" time="7.102168">
+<testsuite name="guide_19_1_Reporting_allure.spec.ts" timestamp="2026-02-06T07:34:58.917Z" hostname="chromium" tests="4" failures="1" skipped="0" time="2.696" errors="0">
+<testcase name="test1" classname="guide_19_1_Reporting_allure.spec.ts" time="0.683">
+<system-out>
+<![CDATA[This is test 1
+]]>
+</system-out>
+</testcase>
+<testcase name="test2" classname="guide_19_1_Reporting_allure.spec.ts" time="0.56">
+<failure message="guide_19_1_Reporting_allure.spec.ts:11:5 test2" type="FAILURE">
+<![CDATA[  [chromium] › guide_19_1_Reporting_allure.spec.ts:11:5 › test2 ────────────────────────────────────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      13 |     const isTest2: boolean = true;
+      14 |     console.log("This is test 2");
+    > 15 |     expect(isTest2).toBe(false);
+         |                     ^
+      16 |
+      17 | })
+      18 |
+        at C:\playwrightTutorials\tests\guide_19_1_Reporting_allure.spec.ts:15:21
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\test-results\guide_19_1_Reporting_allure-test2-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\test-results\guide_19_1_Reporting_allure-test2-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\guide_19_1_Reporting_allure-test2-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\guide_19_1_Reporting_allure-test2-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[This is test 2
+
+[[ATTACHMENT|test-results\guide_19_1_Reporting_allure-test2-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|test-results\guide_19_1_Reporting_allure-test2-chromium\video.webm]]
+
+[[ATTACHMENT|test-results\guide_19_1_Reporting_allure-test2-chromium\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test3" classname="guide_19_1_Reporting_allure.spec.ts" time="0.889">
+<system-out>
+<![CDATA[This is test 3
+]]>
+</system-out>
+</testcase>
+<testcase name="test4" classname="guide_19_1_Reporting_allure.spec.ts" time="0.564">
+<system-out>
+<![CDATA[This is test 4
+]]>
+</system-out>
+</testcase>
+</testsuite>
+</testsuites>

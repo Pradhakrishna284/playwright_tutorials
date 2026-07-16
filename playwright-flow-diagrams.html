@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Playwright Flow Diagrams</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f4f6fa;
+    color: #1a1a1a;
+    padding: 40px 20px;
+  }
+
+  .page-title {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .page-title h1 {
+    font-size: 2rem;
+    color: #26215C;
+    letter-spacing: -0.5px;
+  }
+  .page-title p {
+    color: #5F5E5A;
+    font-size: 0.95rem;
+    margin-top: 6px;
+  }
+
+  .toc {
+    max-width: 720px;
+    margin: 32px auto 40px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  }
+  .toc h2 {
+    font-size: 1rem;
+    color: #5F5E5A;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+  .toc ol {
+    padding-left: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 24px;
+  }
+  .toc li { font-size: 0.92rem; }
+  .toc a { color: #534AB7; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  .section {
+    max-width: 800px;
+    margin: 0 auto 48px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px 36px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .section .desc {
+    font-size: 0.93rem;
+    color: #444441;
+    margin-bottom: 22px;
+    line-height: 1.6;
+    padding-left: 48px;
+  }
+  .diagram-wrap {
+    background: #fafafa;
+    border: 1px solid #e8e8e8;
+    border-radius: 10px;
+    padding: 20px;
+    overflow-x: auto;
+    text-align: center;
+  }
+  .diagram-wrap svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* colour themes per section */
+  .s1 .badge { background:#EEEDFE; color:#26215C; }
+  .s1 h2     { color:#26215C; }
+  .s2 .badge { background:#FAEEDA; color:#412402; }
+  .s2 h2     { color:#412402; }
+  .s3 .badge { background:#E6F1FB; color:#042C53; }
+  .s3 h2     { color:#042C53; }
+  .s4 .badge { background:#FBEAF0; color:#4B1528; }
+  .s4 h2     { color:#4B1528; }
+  .s5 .badge { background:#E1F5EE; color:#04342C; }
+  .s5 h2     { color:#04342C; }
+  .s6 .badge { background:#FAECE7; color:#4A1B0C; }
+  .s6 h2     { color:#4A1B0C; }
+
+  .divider {
+    max-width: 800px;
+    margin: 0 auto 40px;
+    border: none;
+    border-top: 2px dashed #ddd;
+  }
+
+  footer {
+    text-align: center;
+    font-size: 0.82rem;
+    color: #aaa;
+    margin-top: 40px;
+  }
+
+  @media print {
+    body { background: #fff; padding: 20px; }
+    .section { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>🎭 Playwright — Flow Diagrams</h1>
+  <p>Visual reference for all core concepts · TypeScript · playwright.dev</p>
+</div>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#arch">Core Architecture</a></li>
+    <li><a href="#testrun">Single Test Run Lifecycle</a></li>
+    <li><a href="#autowait">Auto-Wait Actionability Checks</a></li>
+    <li><a href="#pom">Page Object Model &amp; Fixtures</a></li>
+    <li><a href="#auth">Authentication &amp; Storage State</a></li>
+    <li><a href="#network">Network Interception &amp; Routing</a></li>
+  </ol>
+</nav>
+
+<!-- ── 1. Architecture ── -->
+<section class="section s1" id="arch">
+  <div class="section-header">
+    <span class="badge">01</span>
+    <h2>Core Architecture — Browser · Context · Page</h2>
+  </div>
+  <p class="desc">
+    Your TypeScript test script connects to a real browser process via a persistent WebSocket
+    (CDP for Chromium, patched protocols for Firefox/WebKit). The Browser spawns isolated
+    BrowserContexts (think incognito windows), each holding one or more Pages (tabs).
+    Every locator action on a Page is routed through the auto-wait engine before touching the DOM.
+  </p>
+  <div class="diagram-wrap">
+    <svg width="680" height="320" viewBox="0 0 680 320" xmlns="http://www.w3.org/2000/svg">
+    <rect width="680" height="320" fill="#fafafa"/>
+    <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#444441" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    </defs>
+    <rect x="40" y="30" width="170" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+    <text x="125" y="51" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#26215C">Test script</text>
+    <text x="125" y="69" text-anchor="middle" font-family="Arial" font-size="12" fill="#3C3489">TypeScript, Node.js</text>
+    <line x1="210" y1="58" x2="262" y2="58" stroke="#444441" stroke-width="1.5" marker-end="url(#a1)"/>
+    <text x="236" y="48" text-anchor="middle" font-family="Arial" font-size="11" fill="#5F5E5A">CDP / WS</text>
+    <rect x="264" y="30" width="170" height="56" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="1.5"/>
+    <text x="349" y="51" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#4A1B0C">Browser</text>
+    <text x="349" y="69" text-anchor="middle" font-family="Arial" font-size="11" fill="#712B13">Chromium / Firefox / WebKit</text>
+    <line x1="349" y1="86" x2="349" y2="130" stroke="#444441" stroke-width="1.5" marker-end="url(#a1)"/>
+    <text x="364" y="114" text-anchor="start" font-family="Arial" font-size="11" fill="#5F5E5A">newContext()</text>
+    <rect x="264" y="134" width="170" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.5"/>
+    <text x="349" y="155" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#04342C">BrowserContext</text>
+    <text x="349" y="173" text-anchor="middle" font-family="Arial" font-size="11" fill="#085041">isolated cookies, storage</text>
+    <line x1="349" y1="190" x2="349" y2="234" stroke="#444441" stroke-width="1.5" marker-end="url(#a1)"/>
+    <text x="364" y="218" text-anchor="start" font-family="Arial" font-size="11" fill="#5F5E5A">newPage()</text>
+    <rect x="264" y="238" width="170" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.5"/>
+    <text x="349" y="259" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#412402">Page (tab)</text>
+    <text x="349" y="277" text-anchor="middle" font-family="Arial" font-size="11" fill="#633806">locator actions run here</text>
+    <line x1="434" y1="266" x2="476" y2="266" stroke="#444441" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="478" y="238" width="162" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+    <text x="559" y="259" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#2C2C2A">Auto-wait engine</text>
+    <text x="559" y="277" text-anchor="middle" font-family="Arial" font-size="11" fill="#444441">checks, then executes</text>
+    <!-- label arrows on left showing 2-way communication -->
+    <path d="M36 32 Q10 80 36 130" fill="none" stroke="#534AB7" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.5"/>
+    <text x="6" y="84" font-family="Arial" font-size="9" fill="#534AB7" opacity="0.7">events</text>
+    </svg>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ── 2. Test Run ── -->
+<section class="section s2" id="testrun">
+  <div class="section-header">
+    <span class="badge">02</span>
+    <h2>Single Test Run Lifecycle (Login Test Example)</h2>
+  </div>
+  <p class="desc">
+    What actually happens from the moment <code>npx playwright test</code> is invoked until the test
+    result is recorded and the context torn down — using a typical login flow as the example.
+  </p>
+  <div class="diagram-wrap">
+    <svg width="560" height="600" viewBox="0 0 560 600" xmlns="http://www.w3.org/2000/svg">
+    <rect width="560" height="600" fill="#fafafa"/>
+    <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#444441" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    </defs>
+
+    <rect x="80" y="20" width="400" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+    <text x="280" y="46" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#2C2C2A">1. Load playwright.config.ts</text>
+    <line x1="280" y1="64" x2="280" y2="88" stroke="#444441" stroke-width="1.5" marker-end="url(#a2)"/>
+
+    <rect x="80" y="92" width="400" height="44" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="1.5"/>
+    <text x="280" y="118" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#4A1B0C">2. Launch Browser (per project)</text>
+    <line x1="280" y1="136" x2="280" y2="160" stroke="#444441" stroke-width="1.5" marker-end="url(#a2)"/>
+
+    <rect x="80" y="164" width="400" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.5"/>
+    <text x="280" y="190" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#04342C">3. Create isolated BrowserContext</text>
+    <line x1="280" y1="208" x2="280" y2="232" stroke="#444441" stroke-width="1.5" marker-end="url(#a2)"/>
+
+    <rect x="80" y="236" width="400" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.5"/>
+    <text x="280" y="262" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#412402">4. page.goto('/login')</text>
+    <line x1="280" y1="280" x2="280" y2="304" stroke="#444441" stroke-width="1.5" marker-end="url(#a2)"/>
+
+    <rect x="80" y="308" width="400" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+    <text x="280" y="334" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#26215C">5. Locator created (lazy — no DOM query yet)</text>
+    <line x1="280" y1="352" x2="280" y2="376" stroke="#444441" stroke-width="1.5" marker-end="url(#a2)"/>
+
+    <rect x="80" y="380" width="400" height="56" rx="8" fill="#FBEAF0" stroke="#993556" stroke-width="1.5"/>
+    <text x="280" y="401" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#4B1528">6. .fill('user') · .click('Login')</text>
+    <text x="280" y="420" text-anchor="middle" font-family="Arial" font-size="11" fill="#72243E">auto-wait checks pass → CDP command sent → browser executes</text>
+    <line x1="280" y1="436" x2="280" y2="460" stroke="#444441" stroke-width="1.5" marker-end="url(#a2)"/>
+
+    <rect x="80" y="464" width="400" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.5"/>
+    <text x="280" y="490" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#173404">7. expect(page).toHaveURL(/dashboard/)  ✓</text>
+    <line x1="280" y1="508" x2="280" y2="532" stroke="#444441" stroke-width="1.5" marker-end="url(#a2)"/>
+
+    <rect x="80" y="536" width="400" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+    <text x="280" y="562" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#2C2C2A">8. Context closes → next test starts fresh</text>
+    </svg>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ── 3. Auto-wait ── -->
+<section class="section s3" id="autowait">
+  <div class="section-header">
+    <span class="badge">03</span>
+    <h2>Auto-Wait — Actionability Checks</h2>
+  </div>
+  <p class="desc">
+    Before every action (click, fill, check…), Playwright runs a sequence of checks.
+    If any check fails, it silently retries the whole sequence until the element satisfies
+    all conditions or the timeout is reached — eliminating almost all manual wait/sleep calls.
+  </p>
+  <div class="diagram-wrap">
+    <svg width="620" height="480" viewBox="0 0 620 480" xmlns="http://www.w3.org/2000/svg">
+    <rect width="620" height="480" fill="#fafafa"/>
+    <defs>
+    <marker id="a3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#444441" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="a3r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#D85A30" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    </defs>
+
+    <rect x="220" y="16" width="180" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+    <text x="310" y="42" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#2C2C2A">locator.click()</text>
+    <line x1="310" y1="60" x2="310" y2="92" stroke="#444441" stroke-width="1.5" marker-end="url(#a3)"/>
+
+    <rect x="220" y="96" width="180" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+    <text x="310" y="122" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#042C53">Attached?</text>
+    <line x1="310" y1="140" x2="310" y2="172" stroke="#444441" stroke-width="1.5" marker-end="url(#a3)"/>
+
+    <rect x="220" y="176" width="180" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+    <text x="310" y="202" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#042C53">Visible?</text>
+    <line x1="310" y1="220" x2="310" y2="252" stroke="#444441" stroke-width="1.5" marker-end="url(#a3)"/>
+
+    <rect x="220" y="256" width="180" height="48" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+    <text x="310" y="278" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#042C53">Stable?</text>
+    <text x="310" y="296" text-anchor="middle" font-family="Arial" font-size="11" fill="#0C447C">(not animating)</text>
+    <line x1="310" y1="304" x2="310" y2="336" stroke="#444441" stroke-width="1.5" marker-end="url(#a3)"/>
+
+    <rect x="220" y="340" width="180" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+    <text x="310" y="366" text-anchor="middle" font-family="Arial" font-size="14" font-weight="bold" fill="#042C53">Receives events?</text>
+    <line x1="310" y1="384" x2="310" y2="416" stroke="#444441" stroke-width="1.5" marker-end="url(#a3)"/>
+
+    <rect x="220" y="420" width="180" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.5"/>
+    <text x="310" y="446" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#173404">Enabled → action runs ✓</text>
+
+    <!-- retry loop -->
+    <path d="M400 118 C 530 118 530 362 402 384" fill="none" stroke="#D85A30" stroke-width="1.4" stroke-dasharray="6 3" marker-end="url(#a3r)" opacity="0.9"/>
+    <rect x="440" y="210" width="140" height="46" rx="8" fill="#FAECE7" stroke="#D85A30" stroke-width="1"/>
+    <text x="510" y="230" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#712B13">Any check fails?</text>
+    <text x="510" y="247" text-anchor="middle" font-family="Arial" font-size="11" fill="#712B13">retry until timeout</text>
+    </svg>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ── 4. POM & Fixtures ── -->
+<section class="section s4" id="pom">
+  <div class="section-header">
+    <span class="badge">04</span>
+    <h2>Page Object Model &amp; Fixtures</h2>
+  </div>
+  <p class="desc">
+    Tests request a custom fixture (<code>loggedInPage</code>) by name. Playwright runs the fixture's
+    setup code (which internally uses the LoginPage POM to navigate and log in), then calls
+    <code>use(page)</code> to hand the ready page to the test. After the test body finishes,
+    any teardown code in the fixture runs automatically.
+  </p>
+  <div class="diagram-wrap">
+    <svg width="620" height="360" viewBox="0 0 620 360" xmlns="http://www.w3.org/2000/svg">
+    <rect width="620" height="360" fill="#fafafa"/>
+    <defs>
+    <marker id="a4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#444441" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    </defs>
+
+    <rect x="30" y="20" width="210" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+    <text x="135" y="46" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#26215C">test('see inventory', ...)</text>
+    <line x1="135" y1="64" x2="135" y2="98" stroke="#444441" stroke-width="1.5" marker-end="url(#a4)"/>
+
+    <rect x="30" y="102" width="210" height="56" rx="8" fill="#FBEAF0" stroke="#993556" stroke-width="1.5"/>
+    <text x="135" y="124" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#4B1528">Requests fixture</text>
+    <text x="135" y="143" text-anchor="middle" font-family="Arial" font-size="12" fill="#72243E">{ loggedInPage }</text>
+    <line x1="135" y1="158" x2="135" y2="192" stroke="#444441" stroke-width="1.5" marker-end="url(#a4)"/>
+
+    <rect x="30" y="196" width="210" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.5"/>
+    <text x="135" y="218" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#04342C">Fixture setup runs</text>
+    <text x="135" y="237" text-anchor="middle" font-family="Arial" font-size="11" fill="#085041">calls LoginPage.login()</text>
+
+    <!-- arrow to POM -->
+    <line x1="240" y1="224" x2="290" y2="224" stroke="#444441" stroke-width="1.5" marker-end="url(#a4)"/>
+
+    <rect x="292" y="180" width="300" height="110" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.5"/>
+    <text x="442" y="204" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#412402">LoginPage (POM)</text>
+    <text x="442" y="224" text-anchor="middle" font-family="Arial" font-size="11" fill="#633806">locators: username · password · loginBtn</text>
+    <text x="442" y="244" text-anchor="middle" font-family="Arial" font-size="11" fill="#633806">goto() · login(user, pass)</text>
+    <text x="442" y="264" text-anchor="middle" font-family="Arial" font-size="11" fill="#633806">One place to update when UI changes</text>
+
+    <!-- use(page) arrow down -->
+    <line x1="135" y1="252" x2="135" y2="300" stroke="#444441" stroke-width="1.5" marker-end="url(#a4)"/>
+    <text x="148" y="280" text-anchor="start" font-family="Arial" font-size="11" fill="#5F5E5A">use(page)</text>
+
+    <rect x="30" y="304" width="210" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.5"/>
+    <text x="135" y="330" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#173404">Test body → asserts outcome</text>
+    </svg>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ── 5. Auth ── -->
+<section class="section s5" id="auth">
+  <div class="section-header">
+    <span class="badge">05</span>
+    <h2>Authentication &amp; Storage State Reuse</h2>
+  </div>
+  <p class="desc">
+    Log in once via a dedicated <em>setup</em> project, save the cookies/localStorage to
+    <code>user.json</code>, then every subsequent test context loads that file and starts
+    already authenticated — no repeated UI login per test.
+  </p>
+  <div class="diagram-wrap">
+    <svg width="460" height="460" viewBox="0 0 460 460" xmlns="http://www.w3.org/2000/svg">
+    <rect width="460" height="460" fill="#fafafa"/>
+    <defs>
+    <marker id="a5" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#444441" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    </defs>
+
+    <rect x="130" y="20" width="200" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.5"/>
+    <text x="230" y="46" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#412402">"setup" project runs once</text>
+    <line x1="230" y1="64" x2="230" y2="98" stroke="#444441" stroke-width="1.5" marker-end="url(#a5)"/>
+
+    <rect x="130" y="102" width="200" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.5"/>
+    <text x="230" y="124" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#412402">Logs in via UI</text>
+    <text x="230" y="143" text-anchor="middle" font-family="Arial" font-size="11" fill="#633806">captures cookies + localStorage</text>
+    <line x1="230" y1="158" x2="230" y2="192" stroke="#444441" stroke-width="1.5" marker-end="url(#a5)"/>
+
+    <rect x="130" y="196" width="200" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.5"/>
+    <text x="230" y="222" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#04342C">Saved → user.json</text>
+    <line x1="230" y1="240" x2="230" y2="274" stroke="#444441" stroke-width="1.5" marker-end="url(#a5)"/>
+
+    <rect x="130" y="278" width="200" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+    <text x="230" y="304" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#042C53">"chromium" depends on setup</text>
+    <line x1="230" y1="322" x2="230" y2="356" stroke="#444441" stroke-width="1.5" marker-end="url(#a5)"/>
+
+    <rect x="130" y="360" width="200" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>
+    <text x="230" y="386" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#042C53">Each context loads user.json</text>
+    <line x1="230" y1="404" x2="230" y2="432" stroke="#444441" stroke-width="1.5" marker-end="url(#a5)"/>
+
+    <rect x="130" y="418" width="200" height="36" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.5"/>
+    <text x="230" y="440" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#173404">Test starts already logged in ✓</text>
+    </svg>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<!-- ── 6. Network ── -->
+<section class="section s6" id="network">
+  <div class="section-header">
+    <span class="badge">06</span>
+    <h2>Network Interception &amp; Routing</h2>
+  </div>
+  <p class="desc">
+    Register <code>page.route(pattern, handler)</code> before any matching request fires.
+    Playwright intercepts the request and lets you choose: mock a response entirely
+    (<code>fulfill</code>), pass it through with optional modifications (<code>continue</code>),
+    or kill it (<code>abort</code>).
+  </p>
+  <div class="diagram-wrap">
+    <svg width="660" height="310" viewBox="0 0 660 310" xmlns="http://www.w3.org/2000/svg">
+    <rect width="660" height="310" fill="#fafafa"/>
+    <defs>
+    <marker id="a6" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#444441" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="a6g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#0F6E56" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="a6p" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#534AB7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="a6r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#993C1D" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    </defs>
+
+    <rect x="30" y="20" width="210" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+    <text x="135" y="46" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#26215C">page.route(pattern, handler)</text>
+    <line x1="135" y1="64" x2="135" y2="98" stroke="#444441" stroke-width="1.5" marker-end="url(#a6)"/>
+
+    <rect x="30" y="102" width="210" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+    <text x="135" y="128" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="#26215C">Matching request fires</text>
+    <line x1="240" y1="124" x2="288" y2="124" stroke="#444441" stroke-width="1.5" marker-end="url(#a6)"/>
+
+    <rect x="290" y="102" width="150" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1.5"/>
+    <text x="365" y="128" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#2C2C2A">Intercepted</text>
+
+    <!-- three branches -->
+    <path d="M365 146 L 365 172 L 135 172 L 135 192" fill="none" stroke="#0F6E56" stroke-width="1.4" marker-end="url(#a6g)"/>
+    <path d="M365 146 L 365 192" fill="none" stroke="#534AB7" stroke-width="1.4" marker-end="url(#a6p)"/>
+    <path d="M365 146 L 365 172 L 595 172 L 595 192" fill="none" stroke="#993C1D" stroke-width="1.4" marker-end="url(#a6r)"/>
+
+    <rect x="55" y="196" width="160" height="64" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.5"/>
+    <text x="135" y="220" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#04342C">route.fulfill()</text>
+    <text x="135" y="238" text-anchor="middle" font-family="Arial" font-size="11" fill="#085041">return mock response</text>
+    <text x="135" y="253" text-anchor="middle" font-family="Arial" font-size="10" fill="#085041">no real network call</text>
+
+    <rect x="285" y="196" width="160" height="64" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+    <text x="365" y="220" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#26215C">route.continue()</text>
+    <text x="365" y="238" text-anchor="middle" font-family="Arial" font-size="11" fill="#3C3489">send with optional</text>
+    <text x="365" y="253" text-anchor="middle" font-family="Arial" font-size="11" fill="#3C3489">header / body changes</text>
+
+    <rect x="515" y="196" width="160" height="64" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="1.5"/>
+    <text x="595" y="220" text-anchor="middle" font-family="Arial" font-size="13" font-weight="bold" fill="#4A1B0C">route.abort()</text>
+    <text x="595" y="238" text-anchor="middle" font-family="Arial" font-size="11" fill="#712B13">cancel request</text>
+    <text x="595" y="253" text-anchor="middle" font-family="Arial" font-size="11" fill="#712B13">simulate net failure</text>
+    </svg>
+  </div>
+</section>
+
+<footer>
+  Playwright with TypeScript · playwright.dev · All diagrams © course notes
+</footer>
+
+</body>
+</html>

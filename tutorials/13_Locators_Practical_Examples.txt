@@ -1,0 +1,1260 @@
+================================================================================
+PLAYWRIGHT LOCATORS - PRACTICAL EXAMPLES
+================================================================================
+Real-world implementation examples with When/Why/await explanations
+Includes comprehensive examples for all 8 built-in locators
+Source: https://playwright.dev/docs/locators
+Date: December 28, 2025
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. Locator Selection Guide (When/Why for each)
+2. Login Form Examples
+3. E-commerce Product Catalog
+4. Data Tables and Grids
+5. Navigation Menus
+6. Modal Dialogs and Popups
+7. Dynamic Content and Lists
+8. Form Validation
+9. Multi-step Wizards
+10. File Upload/Download
+11. Responsive UI Testing
+12. Common Patterns and Anti-patterns
+13. Debugging Techniques
+
+================================================================================
+1. LOCATOR SELECTION GUIDE (When/Why for Each Locator)
+================================================================================
+
+Example 1.1: When to Use getByRole() ⭐ MOST RECOMMENDED
+--------------------------------------------------------
+SCENARIO: Testing a button click
+
+HTML:
+<button type="submit">Sign In</button>
+
+TEST CODE:
+// Creating locator (NO await - just defining how to find element)
+const submitButton = page.getByRole('button', { name: 'Sign In' })
+
+// Using locator (YES await - performing action)
+await submitButton.click()
+
+WHY USE getByRole():
+✓ Tests accessibility - ensures button has proper role
+✓ Reflects how users interact (they see a button with "Sign In" text)
+✓ Most resilient to styling/structure changes
+✓ Recommended as first choice
+
+WHEN TO USE:
+• Interactive elements (buttons, links, checkboxes, radios)
+• Headings and structural elements
+• Any element with ARIA role
+
+
+Example 1.2: When to Use getByLabel() ⭐ BEST FOR FORMS
+--------------------------------------------------------
+SCENARIO: Filling out a registration form
+
+HTML:
+<label for="email">Email Address</label>
+<input id="email" type="email" />
+
+TEST CODE:
+// Creating locator (NO await)
+const emailInput = page.getByLabel('Email Address')
+
+// Using locator (YES await - action needed)
+await emailInput.fill('user@example.com')
+
+// Assertion (YES await)
+await expect(emailInput).toHaveValue('user@example.com')
+
+WHY USE getByLabel():
+✓ Mirrors how users find form fields (by reading labels)
+✓ Ensures proper label-input association (accessibility requirement)
+✓ Label text more stable than placeholder or id
+✓ Works even if input is hidden in custom components
+
+WHEN TO USE:
+• Form fields (input, select, textarea) with labels
+• Any input with associated <label> element
+• Form validation scenarios
+
+
+Example 1.3: When to Use getByPlaceholder()
+--------------------------------------------
+SCENARIO: Search box without visible label
+
+HTML:
+<input type="search" placeholder="Search products..." />
+
+TEST CODE:
+// Creating locator (NO await)
+const searchBox = page.getByPlaceholder('Search products...')
+
+// Using locators (YES await - actions)
+await searchBox.fill('laptop')
+await searchBox.press('Enter')
+
+WHY USE getByPlaceholder():
+✓ Placeholder is visible hint to users
+✓ Common in search boxes and minimal UI designs
+✓ Fallback when labels not available
+
+WHEN TO USE:
+• Form elements without visible labels
+• Search boxes
+• Modern UI designs using placeholders instead of labels
+
+WHEN NOT TO USE:
+✗ If a label exists - use getByLabel() instead
+
+
+Example 1.4: When to Use getByText()
+-------------------------------------
+SCENARIO: Verifying success message appears
+
+HTML:
+<div class="success-message">Your account has been created successfully!</div>
+
+TEST CODE:
+// Using directly with assertion (YES await - assertion needs it)
+await expect(page.getByText('Your account has been created')).toBeVisible()
+
+// Exact match
+await expect(page.getByText('Success!', { exact: true })).toBeVisible()
+
+// Case-insensitive regex
+await expect(page.getByText(/success/i)).toBeVisible()
+
+WHY USE getByText():
+✓ Text is what users see and read
+✓ Simple and intuitive for content verification
+✓ Works with substring, exact, or regex matching
+
+WHEN TO USE:
+• Non-interactive elements (div, span, p)
+• Verifying text content is displayed
+• Filtering items in a list
+
+WHEN NOT TO USE:
+✗ Interactive elements (buttons, links) - use getByRole instead
+✗ Form fields - use getByLabel instead
+
+
+Example 1.5: When to Use getByAltText()
+----------------------------------------
+SCENARIO: Clicking on a logo image
+
+HTML:
+<a href="/"><img src="logo.png" alt="Company Logo" /></a>
+
+TEST CODE:
+// Creating locator (NO await)
+const logo = page.getByAltText('Company Logo')
+
+// Using locators (YES await - actions)
+await logo.click()
+await expect(logo).toBeVisible()
+
+// Getting attribute (YES await - getter)
+const logoSrc = await logo.getAttribute('src')
+
+WHY USE getByAltText():
+✓ Alt text is required for accessibility
+✓ Describes image content for screen readers
+✓ More semantic than CSS selectors
+✓ Tests that images have proper descriptions
+
+WHEN TO USE:
+• Image elements (<img>)
+• Area elements (<area>)
+• Accessibility testing for images
+
+WHEN NOT TO USE:
+✗ Images without alt text (accessibility issue!)
+
+
+Example 1.6: When to Use getByTitle()
+--------------------------------------
+SCENARIO: Clicking icon button with tooltip
+
+HTML:
+<button title="Close dialog" aria-label="Close">
+  <svg>...</svg>  <!-- Icon, no visible text -->
+</button>
+
+TEST CODE:
+// Creating locator (NO await)
+const closeButton = page.getByTitle('Close dialog')
+
+// Using locators (YES await)
+await closeButton.hover()  // Show tooltip
+await closeButton.click()
+
+WHY USE getByTitle():
+✓ Title shows as tooltip on hover
+✓ Useful when element lacks visible text
+✓ Common in icon-only buttons and links
+
+WHEN TO USE:
+• Icon-only buttons
+• Elements with title attributes
+• Tooltips or informational elements
+
+WHEN NOT TO USE:
+✗ If element has visible text - use getByRole or getByText
+
+
+Example 1.7: When to Use getByTestId() ⭐ MOST RESILIENT
+---------------------------------------------------------
+SCENARIO: Element text changes frequently (translations, A/B testing)
+
+HTML:
+<button data-testid="checkout-btn">
+  Proceed to Checkout  <!-- Text might change or be translated -->
+</button>
+
+TEST CODE:
+// Creating locator (NO await)
+const checkoutBtn = page.getByTestId('checkout-btn')
+
+// Using locator (YES await)
+await checkoutBtn.click()
+
+WHY USE getByTestId():
+✓ Most resilient to UI changes
+✓ Survives text changes (translations, content updates)
+✓ Survives role/structure changes
+✓ Explicit contract between dev and test teams
+
+WHEN TO USE:
+• Text changes frequently (i18n, A/B tests)
+• Can't locate by role or text
+• Need stable test automation
+• Dynamic content
+
+WHEN NOT TO USE:
+✗ If you can use getByRole or getByLabel
+✗ Not user-facing - prefer accessibility-focused locators
+
+BEST PRACTICES:
+✓ Use kebab-case: 'checkout-btn' not 'checkoutBtn'
+✓ Be descriptive: 'shopping-cart-icon' not 'icon1'
+✗ Avoid: 'btn1', 'div2'
+
+
+Example 1.8: When to Use locator() ⚠️ LAST RESORT
+--------------------------------------------------
+SCENARIO: No other locator method works
+
+HTML:
+<div class="custom-dropdown" data-custom-id="123">
+  <input type="text" />
+</div>
+
+TEST CODE:
+// CSS selector (YES await for action)
+await page.locator('.custom-dropdown input').fill('value')
+
+// Attribute selector
+await page.locator('[data-custom-id="123"]').click()
+
+WHY AVOID locator():
+✗ Tied to DOM structure (fragile)
+✗ Breaks easily when HTML changes
+✗ Not user-facing
+✗ Poor accessibility testing
+
+WHEN TO USE:
+✓ Only as last resort
+✓ When no other locator works
+✓ Complex DOM queries
+
+BETTER ALTERNATIVES:
+Instead of: page.locator('#search-input')
+Try:        page.getByRole('textbox', { name: 'Search' })
+Try:        page.getByPlaceholder('Search...')
+Try:        page.getByTestId('search-input')
+
+
+Example 1.9: await Usage Rules Summary
+---------------------------------------
+✅ USE await FOR:
+
+Actions (return Promises):
+  await page.getByRole('button').click()
+  await page.getByLabel('Email').fill('test@example.com')
+  await page.getByRole('checkbox').check()
+  await page.getByPlaceholder('Search').press('Enter')
+
+Assertions (return Promises):
+  await expect(page.getByText('Success')).toBeVisible()
+  await expect(page.getByRole('heading')).toHaveText('Welcome')
+
+Getters (return Promises):
+  const text = await page.getByText('Price').textContent()
+  const count = await page.getByRole('listitem').count()
+  const value = await page.getByLabel('Email').inputValue()
+
+❌ DON'T USE await FOR:
+
+Creating Locators (synchronous):
+  const button = page.getByRole('button')        // NO await
+  const email = page.getByLabel('Email')         // NO await
+  const items = page.getByRole('listitem')       // NO await
+
+Chaining Locators (synchronous):
+  const firstItem = page.getByRole('listitem').first()  // NO await
+  const filtered = page.getByRole('button').filter({ hasText: 'Submit' })
+
+
+================================================================================
+2. LOGIN FORM EXAMPLES
+================================================================================
+
+Example 2.1: Basic Login Form with getByLabel()
+------------------------------------------------
+Example 2.1: Basic Login Form with getByLabel()
+------------------------------------------------
+WHY THIS APPROACH:
+✓ getByLabel() is BEST FOR FORMS
+✓ Tests label-input association (accessibility)
+✓ Mirrors how users find form fields
+
+HTML:
+<form>
+  <label>Username <input type="text" /></label>
+  <label>Password <input type="password" /></label>
+  <button>Sign in</button>
+</form>
+
+Test Code:
+import { test, expect } from '@playwright/test';
+
+test('user can login using getByLabel', async ({ page }) => {
+  await page.goto('https://example.com/login');
+  
+  // WHY getByLabel: Form fields with labels (best practice)
+  // NO await when creating locators
+  const usernameInput = page.getByLabel('Username')
+  const passwordInput = page.getByLabel('Password')
+  
+  // YES await when performing actions
+  await usernameInput.fill('john.doe')      // Action - needs await
+  await passwordInput.fill('secret123')     // Action - needs await
+  
+  // WHY getByRole: Interactive element (button)
+  // YES await for action
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  
+  // YES await for assertion
+  await expect(page.getByText('Welcome, John')).toBeVisible()
+});
+
+
+Example 2.2: Login with Placeholder-based Fields
+-------------------------------------------------
+WHEN TO USE getByPlaceholder:
+✓ Form elements without visible labels
+✓ Search boxes and minimal UI designs
+
+HTML:
+<form>
+  <input type="email" placeholder="Enter your email" />
+  <input type="password" placeholder="Enter your password" />
+  <button type="submit">Login</button>
+</form>
+
+Test Code:
+test('login with placeholder fields', async ({ page }) => {
+  await page.goto('https://example.com/login');
+  
+  // WHY getByPlaceholder: No labels available, placeholder is visible to users
+  // Creating locators (NO await)
+  const emailField = page.getByPlaceholder('Enter your email')
+  const passwordField = page.getByPlaceholder('Enter your password')
+  
+  // Using locators (YES await for actions)
+  await emailField.fill('user@example.com')
+  await passwordField.fill('Pass123!')
+  
+  // WHY getByRole: Button is interactive element
+  // YES await for action
+  await page.getByRole('button', { name: /login/i }).click()
+  
+  // YES await - checking URL change
+  await expect(page).toHaveURL(/.*dashboard/)
+});
+
+
+Example 2.3: Login with Remember Me Checkbox
+---------------------------------------------
+DEMONSTRATES:
+- getByRole for checkbox (accessibility)
+- State verification with assertions
+
+test('login with remember me option', async ({ page }) => {
+  await page.goto('https://example.com/login');
+  
+  // Form fields (YES await for actions)
+  await page.getByLabel('Username').fill('john.doe')
+  await page.getByLabel('Password').fill('secret123')
+  
+  // WHY getByRole: Checkbox is interactive form control
+  // Creating locator (NO await)
+  const rememberMe = page.getByRole('checkbox', { name: 'Remember me' })
+  
+  // Check checkbox (YES await - action)
+  await rememberMe.check()
+  
+  // Verify checked state (YES await - assertion)
+  await expect(rememberMe).toBeChecked()
+  
+  // Submit (YES await - action)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+});
+
+
+Example 2.4: Login with Error Handling
+---------------------------------------
+DEMONSTRATES:
+- Error message verification with getByText
+- When to use exact text matching
+
+test('shows error for invalid credentials', async ({ page }) => {
+  await page.goto('https://example.com/login');
+  
+  await page.getByLabel('Username').fill('invalid');
+  await page.getByLabel('Password').fill('wrong');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  
+  // Check for error message
+  await expect(page.getByRole('alert'))
+    .toHaveText('Invalid username or password');
+  
+  // Or using getByText for error messages
+  await expect(page.getByText('Invalid username or password'))
+    .toBeVisible();
+});
+
+
+================================================================================
+2. E-COMMERCE PRODUCT CATALOG
+================================================================================
+
+Example 2.1: Filtering Products by Category
+--------------------------------------------
+HTML Structure:
+<div class="products">
+  <article>
+    <h2>Laptop</h2>
+    <span>Electronics</span>
+    <button>Add to cart</button>
+  </article>
+  <article>
+    <h2>T-Shirt</h2>
+    <span>Clothing</span>
+    <button>Add to cart</button>
+  </article>
+</div>
+
+Test Code:
+test('add specific product to cart', async ({ page }) => {
+  await page.goto('https://shop.example.com');
+  
+  // Find product by heading, then click its add to cart button
+  const laptopCard = page
+    .getByRole('article')
+    .filter({ has: page.getByRole('heading', { name: 'Laptop' }) });
+  
+  await laptopCard.getByRole('button', { name: 'Add to cart' }).click();
+  
+  // Verify cart count increased
+  await expect(page.getByTestId('cart-count')).toHaveText('1');
+});
+
+
+Example 2.2: Product Search and Selection
+------------------------------------------
+test('search and select product', async ({ page }) => {
+  await page.goto('https://shop.example.com');
+  
+  // Search for product
+  await page.getByPlaceholder('Search products...').fill('wireless mouse');
+  await page.getByRole('button', { name: 'Search' }).click();
+  
+  // Wait for results
+  await expect(page.getByText(/found \d+ results/i)).toBeVisible();
+  
+  // Select first product
+  await page
+    .getByRole('article')
+    .filter({ hasText: 'wireless' })
+    .first()
+    .getByRole('link', { name: 'View details' })
+    .click();
+  
+  // Verify product page
+  await expect(page.getByRole('heading', { level: 1 }))
+    .toContainText('wireless mouse', { ignoreCase: true });
+});
+
+
+Example 2.3: Multi-filter Product Search
+-----------------------------------------
+test('filter products by multiple criteria', async ({ page }) => {
+  await page.goto('https://shop.example.com/products');
+  
+  // Filter by category
+  await page.getByRole('combobox', { name: 'Category' })
+    .selectOption('Electronics');
+  
+  // Filter by price range
+  await page.getByLabel('Min Price').fill('100');
+  await page.getByLabel('Max Price').fill('500');
+  
+  // Filter by brand (checkbox)
+  await page.getByRole('checkbox', { name: 'Samsung' }).check();
+  await page.getByRole('checkbox', { name: 'Apple' }).check();
+  
+  // Apply filters
+  await page.getByRole('button', { name: 'Apply Filters' }).click();
+  
+  // Verify filtered results
+  const products = page.getByRole('article');
+  await expect(products).toHaveCount(5); // Example assertion
+});
+
+
+Example 2.4: Shopping Cart Operations
+--------------------------------------
+test('manage shopping cart items', async ({ page }) => {
+  await page.goto('https://shop.example.com/cart');
+  
+  // Get specific cart item
+  const cartItem = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Wireless Mouse' });
+  
+  // Update quantity
+  await cartItem.getByLabel('Quantity').fill('3');
+  
+  // Verify price updated
+  await expect(cartItem.getByTestId('item-total')).toHaveText('$89.97');
+  
+  // Remove item
+  await cartItem.getByRole('button', { name: 'Remove' }).click();
+  
+  // Verify item removed
+  await expect(page.getByText('Wireless Mouse')).not.toBeVisible();
+});
+
+
+================================================================================
+3. DATA TABLES AND GRIDS
+================================================================================
+
+Example 3.1: Finding and Clicking Table Row
+--------------------------------------------
+HTML:
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>John Doe</td>
+      <td>john@example.com</td>
+      <td><button>Edit</button> <button>Delete</button></td>
+    </tr>
+  </tbody>
+</table>
+
+Test Code:
+test('edit user from table', async ({ page }) => {
+  await page.goto('https://admin.example.com/users');
+  
+  // Find row by user name
+  const userRow = page.getByRole('row').filter({ hasText: 'John Doe' });
+  
+  // Click edit button in that row
+  await userRow.getByRole('button', { name: 'Edit' }).click();
+  
+  // Verify edit dialog appeared
+  await expect(page.getByRole('dialog', { name: 'Edit User' }))
+    .toBeVisible();
+});
+
+
+Example 3.2: Sorting Table Columns
+-----------------------------------
+test('sort users by email', async ({ page }) => {
+  await page.goto('https://admin.example.com/users');
+  
+  // Click on email column header to sort
+  await page
+    .getByRole('columnheader', { name: 'Email' })
+    .click();
+  
+  // Verify sorting indicator
+  await expect(page.getByRole('columnheader', { name: 'Email' }))
+    .toHaveAttribute('aria-sort', 'ascending');
+  
+  // Click again to reverse sort
+  await page.getByRole('columnheader', { name: 'Email' }).click();
+  
+  await expect(page.getByRole('columnheader', { name: 'Email' }))
+    .toHaveAttribute('aria-sort', 'descending');
+});
+
+
+Example 3.3: Selecting Multiple Rows
+-------------------------------------
+test('select and delete multiple users', async ({ page }) => {
+  await page.goto('https://admin.example.com/users');
+  
+  // Select specific users
+  const users = ['John Doe', 'Jane Smith', 'Bob Johnson'];
+  
+  for (const userName of users) {
+    await page
+      .getByRole('row')
+      .filter({ hasText: userName })
+      .getByRole('checkbox')
+      .check();
+  }
+  
+  // Click bulk delete button
+  await page.getByRole('button', { name: 'Delete Selected' }).click();
+  
+  // Confirm deletion
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Confirm' })
+    .click();
+  
+  // Verify users deleted
+  await expect(page.getByText('John Doe')).not.toBeVisible();
+  await expect(page.getByText('Jane Smith')).not.toBeVisible();
+});
+
+
+Example 3.4: Paginated Table Navigation
+----------------------------------------
+test('navigate through table pages', async ({ page }) => {
+  await page.goto('https://admin.example.com/users');
+  
+  // Verify first page
+  await expect(page.getByText('Page 1 of 10')).toBeVisible();
+  
+  // Go to next page
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('Page 2 of 10')).toBeVisible();
+  
+  // Go to specific page
+  await page.getByLabel('Go to page').fill('5');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Page 5 of 10')).toBeVisible();
+  
+  // Go to last page
+  await page.getByRole('button', { name: 'Last' }).click();
+  await expect(page.getByText('Page 10 of 10')).toBeVisible();
+});
+
+
+================================================================================
+4. NAVIGATION MENUS
+================================================================================
+
+Example 4.1: Multi-level Navigation
+------------------------------------
+test('navigate through menu hierarchy', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Navigate to Products -> Electronics -> Laptops
+  await page.getByRole('navigation').getByRole('link', { name: 'Products' }).click();
+  
+  // In submenu, find Electronics
+  await page.getByRole('link', { name: 'Electronics' }).click();
+  
+  // In Electronics submenu, click Laptops
+  await page
+    .getByRole('navigation')
+    .getByRole('link', { name: 'Laptops' })
+    .click();
+  
+  // Verify on laptops page
+  await expect(page.getByRole('heading', { name: 'Laptops' })).toBeVisible();
+});
+
+
+Example 4.2: Responsive Mobile Menu
+------------------------------------
+test('mobile menu navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 }); // Mobile size
+  await page.goto('https://example.com');
+  
+  // Open hamburger menu
+  await page.getByRole('button', { name: 'Menu' }).click();
+  
+  // Navigate in mobile menu
+  await page
+    .getByRole('navigation')
+    .getByRole('link', { name: 'About Us' })
+    .click();
+  
+  // Verify navigation
+  await expect(page).toHaveURL(/.*about/);
+});
+
+
+Example 4.3: Dropdown Menu Selection
+-------------------------------------
+test('select from dropdown menu', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Hover to open dropdown (if hover-triggered)
+  const accountMenu = page.getByRole('button', { name: 'Account' });
+  await accountMenu.hover();
+  
+  // Or click to open
+  await accountMenu.click();
+  
+  // Select option from dropdown
+  await page
+    .getByRole('menu')
+    .getByRole('menuitem', { name: 'Settings' })
+    .click();
+  
+  await expect(page.getByRole('heading', { name: 'Account Settings' }))
+    .toBeVisible();
+});
+
+
+================================================================================
+5. MODAL DIALOGS AND POPUPS
+================================================================================
+
+Example 5.1: Basic Modal Dialog
+--------------------------------
+test('interact with modal dialog', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  // Open modal
+  await page.getByRole('button', { name: 'Delete Account' }).click();
+  
+  // Verify modal appeared
+  const dialog = page.getByRole('dialog', { name: 'Confirm Deletion' });
+  await expect(dialog).toBeVisible();
+  
+  // Read modal content
+  await expect(dialog.getByText('Are you sure?')).toBeVisible();
+  
+  // Confirm action
+  await dialog.getByRole('button', { name: 'Confirm' }).click();
+  
+  // Verify modal closed
+  await expect(dialog).not.toBeVisible();
+});
+
+
+Example 5.2: Form in Modal
+---------------------------
+test('submit form in modal', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await page.getByRole('button', { name: 'Add User' }).click();
+  
+  const dialog = page.getByRole('dialog');
+  
+  // Fill form in modal
+  await dialog.getByLabel('Name').fill('John Doe');
+  await dialog.getByLabel('Email').fill('john@example.com');
+  await dialog.getByRole('combobox', { name: 'Role' }).selectOption('Admin');
+  
+  // Submit
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  
+  // Verify success message
+  await expect(page.getByText('User added successfully')).toBeVisible();
+});
+
+
+Example 5.3: Dismissing Modal
+------------------------------
+test('close modal with X button', async ({ page }) => {
+  await page.goto('https://example.com');
+  
+  await page.getByRole('button', { name: 'Show Info' }).click();
+  
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  
+  // Close using X button
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  
+  // Or close using Escape key
+  // await page.keyboard.press('Escape');
+  
+  await expect(dialog).not.toBeVisible();
+});
+
+
+================================================================================
+6. DYNAMIC CONTENT AND LISTS
+================================================================================
+
+Example 6.1: Waiting for Dynamic Content
+-----------------------------------------
+test('wait for content to load', async ({ page }) => {
+  await page.goto('https://example.com/posts');
+  
+  // Content loads asynchronously
+  await expect(page.getByRole('article')).toHaveCount(10);
+  
+  // Or wait for specific content
+  await expect(page.getByText('Latest Post Title')).toBeVisible();
+});
+
+
+Example 6.2: Infinite Scroll
+-----------------------------
+test('load more items with infinite scroll', async ({ page }) => {
+  await page.goto('https://example.com/feed');
+  
+  // Initial items
+  await expect(page.getByRole('article')).toHaveCount(20);
+  
+  // Scroll to bottom
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  
+  // Wait for more items to load
+  await expect(page.getByRole('article')).toHaveCount(40);
+});
+
+
+Example 6.3: Load More Button
+------------------------------
+test('click load more button', async ({ page }) => {
+  await page.goto('https://example.com/products');
+  
+  const initialCount = await page.getByRole('article').count();
+  
+  // Click load more
+  await page.getByRole('button', { name: 'Load More' }).click();
+  
+  // Verify more items loaded
+  await expect(page.getByRole('article'))
+    .toHaveCount(initialCount + 10);
+});
+
+
+Example 6.4: Real-time Updates
+-------------------------------
+test('verify real-time content updates', async ({ page }) => {
+  await page.goto('https://example.com/dashboard');
+  
+  // Check initial status
+  await expect(page.getByTestId('status')).toHaveText('Offline');
+  
+  // Trigger status change (e.g., via API or user action)
+  await page.getByRole('button', { name: 'Connect' }).click();
+  
+  // Wait for real-time update
+  await expect(page.getByTestId('status')).toHaveText('Online', {
+    timeout: 10000
+  });
+});
+
+
+================================================================================
+7. FORM VALIDATION
+================================================================================
+
+Example 7.1: Client-side Validation
+------------------------------------
+test('verify email validation', async ({ page }) => {
+  await page.goto('https://example.com/register');
+  
+  // Enter invalid email
+  await page.getByLabel('Email').fill('invalid-email');
+  await page.getByLabel('Email').blur(); // Trigger validation
+  
+  // Check for validation error
+  await expect(page.getByText('Please enter a valid email'))
+    .toBeVisible();
+  
+  // Enter valid email
+  await page.getByLabel('Email').fill('user@example.com');
+  
+  // Error should disappear
+  await expect(page.getByText('Please enter a valid email'))
+    .not.toBeVisible();
+});
+
+
+Example 7.2: Required Fields
+-----------------------------
+test('verify required fields', async ({ page }) => {
+  await page.goto('https://example.com/register');
+  
+  // Try to submit with empty fields
+  await page.getByRole('button', { name: 'Register' }).click();
+  
+  // Check for required field errors
+  await expect(page.getByText('Name is required')).toBeVisible();
+  await expect(page.getByText('Email is required')).toBeVisible();
+  await expect(page.getByText('Password is required')).toBeVisible();
+});
+
+
+Example 7.3: Password Strength Validation
+------------------------------------------
+test('password strength indicator', async ({ page }) => {
+  await page.goto('https://example.com/register');
+  
+  const passwordField = page.getByLabel('Password');
+  
+  // Weak password
+  await passwordField.fill('123');
+  await expect(page.getByText('Weak')).toBeVisible();
+  await expect(page.getByTestId('strength-meter'))
+    .toHaveAttribute('data-strength', 'weak');
+  
+  // Medium password
+  await passwordField.fill('Pass123');
+  await expect(page.getByText('Medium')).toBeVisible();
+  
+  // Strong password
+  await passwordField.fill('Pass123!@#');
+  await expect(page.getByText('Strong')).toBeVisible();
+});
+
+
+================================================================================
+8. MULTI-STEP WIZARDS
+================================================================================
+
+Example 8.1: Registration Wizard
+---------------------------------
+test('complete multi-step registration', async ({ page }) => {
+  await page.goto('https://example.com/signup');
+  
+  // Step 1: Personal Info
+  await page.getByLabel('First Name').fill('John');
+  await page.getByLabel('Last Name').fill('Doe');
+  await page.getByLabel('Email').fill('john@example.com');
+  await page.getByRole('button', { name: 'Next' }).click();
+  
+  // Step 2: Account Details
+  await expect(page.getByText('Step 2 of 3')).toBeVisible();
+  await page.getByLabel('Username').fill('johndoe');
+  await page.getByLabel('Password').fill('SecurePass123!');
+  await page.getByRole('button', { name: 'Next' }).click();
+  
+  // Step 3: Preferences
+  await expect(page.getByText('Step 3 of 3')).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Newsletter' }).check();
+  await page.getByRole('combobox', { name: 'Language' }).selectOption('en');
+  await page.getByRole('button', { name: 'Complete' }).click();
+  
+  // Verify completion
+  await expect(page.getByText('Registration Successful')).toBeVisible();
+});
+
+
+Example 8.2: Wizard Navigation (Back/Forward)
+----------------------------------------------
+test('navigate back and forth in wizard', async ({ page }) => {
+  await page.goto('https://example.com/wizard');
+  
+  // Step 1
+  await page.getByLabel('Field1').fill('Value1');
+  await page.getByRole('button', { name: 'Next' }).click();
+  
+  // Step 2
+  await page.getByLabel('Field2').fill('Value2');
+  
+  // Go back
+  await page.getByRole('button', { name: 'Back' }).click();
+  
+  // Verify step 1 and data persisted
+  await expect(page.getByLabel('Field1')).toHaveValue('Value1');
+  
+  // Continue forward again
+  await page.getByRole('button', { name: 'Next' }).click();
+  
+  // Verify step 2 data persisted
+  await expect(page.getByLabel('Field2')).toHaveValue('Value2');
+});
+
+
+================================================================================
+9. FILE UPLOAD/DOWNLOAD
+================================================================================
+
+Example 9.1: Single File Upload
+--------------------------------
+test('upload file', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  // Using file input
+  const fileInput = page.getByLabel('Upload file');
+  await fileInput.setInputFiles('path/to/file.pdf');
+  
+  // Verify file selected
+  await expect(page.getByText('file.pdf')).toBeVisible();
+  
+  // Upload
+  await page.getByRole('button', { name: 'Upload' }).click();
+  
+  // Verify success
+  await expect(page.getByText('File uploaded successfully')).toBeVisible();
+});
+
+
+Example 9.2: Multiple File Upload
+----------------------------------
+test('upload multiple files', async ({ page }) => {
+  await page.goto('https://example.com/upload');
+  
+  const fileInput = page.getByLabel('Upload files');
+  await fileInput.setInputFiles([
+    'path/to/file1.pdf',
+    'path/to/file2.jpg',
+    'path/to/file3.doc'
+  ]);
+  
+  // Verify all files listed
+  await expect(page.getByText('3 files selected')).toBeVisible();
+  await expect(page.getByText('file1.pdf')).toBeVisible();
+  await expect(page.getByText('file2.jpg')).toBeVisible();
+});
+
+
+Example 9.3: File Download
+---------------------------
+test('download file', async ({ page }) => {
+  await page.goto('https://example.com/downloads');
+  
+  // Start waiting for download before clicking
+  const downloadPromise = page.waitForEvent('download');
+  
+  await page.getByRole('link', { name: 'Download Report' }).click();
+  
+  const download = await downloadPromise;
+  
+  // Verify filename
+  expect(download.suggestedFilename()).toBe('report.pdf');
+  
+  // Save to specific location
+  await download.saveAs('path/to/save/report.pdf');
+});
+
+
+================================================================================
+10. RESPONSIVE UI TESTING
+================================================================================
+
+Example 10.1: Mobile vs Desktop Views
+--------------------------------------
+test('responsive navigation', async ({ page }) => {
+  // Desktop view
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('https://example.com');
+  
+  // Desktop navigation visible
+  await expect(page.getByRole('navigation').getByRole('link', { name: 'Home' }))
+    .toBeVisible();
+  await expect(page.getByRole('button', { name: 'Menu' }))
+    .not.toBeVisible();
+  
+  // Mobile view
+  await page.setViewportSize({ width: 375, height: 667 });
+  
+  // Desktop navigation hidden, hamburger menu visible
+  await expect(page.getByRole('button', { name: 'Menu' }))
+    .toBeVisible();
+});
+
+
+Example 10.2: Testing Different Breakpoints
+--------------------------------------------
+test('test multiple viewport sizes', async ({ page }) => {
+  const viewports = [
+    { width: 375, height: 667, name: 'mobile' },
+    { width: 768, height: 1024, name: 'tablet' },
+    { width: 1920, height: 1080, name: 'desktop' }
+  ];
+  
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('https://example.com');
+    
+    // Take screenshot for visual comparison
+    await page.screenshot({ path: `screenshot-${viewport.name}.png` });
+    
+    // Assert responsive behavior
+    if (viewport.name === 'mobile') {
+      await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible();
+    } else {
+      await expect(page.getByRole('navigation')).toBeVisible();
+    }
+  }
+});
+
+
+================================================================================
+11. COMMON PATTERNS AND ANTI-PATTERNS
+================================================================================
+
+ANTI-PATTERN 1: Using nth() Without Context
+--------------------------------------------
+✗ BAD:
+await page.locator('button').nth(2).click();
+
+✓ GOOD:
+await page
+  .getByRole('article')
+  .filter({ hasText: 'Product Name' })
+  .getByRole('button', { name: 'Buy' })
+  .click();
+
+
+ANTI-PATTERN 2: Long CSS Selectors
+-----------------------------------
+✗ BAD:
+await page.locator('#root > div.container > div.content > form > div:nth-child(3) > input').fill('text');
+
+✓ GOOD:
+await page.getByLabel('Email').fill('text');
+
+
+ANTI-PATTERN 3: Not Using Auto-waiting
+---------------------------------------
+✗ BAD:
+await page.waitForTimeout(5000);
+await page.locator('button').click();
+
+✓ GOOD:
+await page.getByRole('button', { name: 'Submit' }).click();
+// Playwright auto-waits for element to be actionable
+
+
+PATTERN 1: Page Object with Locators
+-------------------------------------
+class LoginPage {
+  constructor(page) {
+    this.page = page;
+    this.usernameInput = page.getByLabel('Username');
+    this.passwordInput = page.getByLabel('Password');
+    this.submitButton = page.getByRole('button', { name: 'Sign in' });
+    this.errorMessage = page.getByRole('alert');
+  }
+  
+  async login(username, password) {
+    await this.usernameInput.fill(username);
+    await this.passwordInput.fill(password);
+    await this.submitButton.click();
+  }
+  
+  async getErrorMessage() {
+    return await this.errorMessage.textContent();
+  }
+}
+
+
+PATTERN 2: Reusable Locator Functions
+--------------------------------------
+function getProductCard(page, productName) {
+  return page
+    .getByRole('article')
+    .filter({ has: page.getByRole('heading', { name: productName }) });
+}
+
+// Usage
+await getProductCard(page, 'Laptop').getByRole('button', { name: 'Buy' }).click();
+
+
+PATTERN 3: Conditional Interactions
+------------------------------------
+// Handle optional popup
+const popup = page.getByRole('dialog', { name: 'Newsletter' });
+if (await popup.isVisible()) {
+  await popup.getByRole('button', { name: 'Close' }).click();
+}
+
+
+================================================================================
+12. DEBUGGING TECHNIQUES
+================================================================================
+
+Technique 1: Check Locator Count
+---------------------------------
+// See how many elements match
+const count = await page.getByRole('button').count();
+console.log(`Found ${count} buttons`);
+
+// If count is 0, locator doesn't match anything
+// If count > 1, may cause strictness error
+
+
+Technique 2: Get All Matching Elements
+---------------------------------------
+const buttons = await page.getByRole('button').all();
+for (const button of buttons) {
+  const text = await button.textContent();
+  console.log(`Button text: ${text}`);
+}
+
+
+Technique 3: Use Playwright Inspector
+--------------------------------------
+// Add this to pause execution
+await page.pause();
+
+// Run test with debug flag
+// npx playwright test --debug
+
+
+Technique 4: Screenshot Locator
+--------------------------------
+await page.getByRole('article').screenshot({ path: 'element.png' });
+
+
+Technique 5: Highlight Elements
+--------------------------------
+await page.getByRole('button').highlight();
+
+
+Technique 6: Get Element Properties
+------------------------------------
+const button = page.getByRole('button', { name: 'Submit' });
+console.log(await button.textContent());
+console.log(await button.getAttribute('class'));
+console.log(await button.isVisible());
+console.log(await button.isEnabled());
+
+
+Technique 7: Using Code Generator
+----------------------------------
+// Generate locators automatically
+// npx playwright codegen https://example.com
+
+// Playwright will show you the recommended locators
+// as you interact with the page
+
+
+================================================================================
+END OF PRACTICAL EXAMPLES
+================================================================================
+Total Examples: 50+
+Categories Covered: 12
+Use these examples as templates for your own tests!
